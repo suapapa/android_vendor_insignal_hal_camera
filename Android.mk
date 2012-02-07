@@ -20,6 +20,7 @@ LOCAL_SRC_FILES := \
 
 LOCAL_SHARED_LIBRARIES := \
 	libcamera_client \
+	libcutils \
 	libjpeg \
 	liblog \
 	libui \

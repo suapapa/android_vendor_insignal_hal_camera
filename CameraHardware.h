@@ -294,6 +294,8 @@ private:
     int                 mCurrentPreviewFrame;
     int                 mCurrentRecordingFrame;
 
+    char*               mCameraPowerFile;
+
     /****************************************************************************
      * Camera API callbacks as defined by camera_device_ops structure.
      * See hardware/libhardware/include/hardware/camera.h for information on

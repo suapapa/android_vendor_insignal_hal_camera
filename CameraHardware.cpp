@@ -18,6 +18,7 @@
 #define LOG_TAG "CameraHardware"
 
 #include <utils/Log.h>
+#include <cutils/properties.h>
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <sys/stat.h> /* for mode definitions */
@@ -101,7 +102,7 @@
 #endif
 
 // File to control camera power
-#define CAMERA_POWER        "/sys/devices/platform/shuttle-pm-camera/power_on"
+#define CAMERA_POWER_FILE  "camera.power_file"
 
 namespace android {
 
@@ -109,13 +110,21 @@ bool CameraHardware::PowerOn()
 {
     LOGD("CameraHardware::PowerOn: Power ON camera.");
 
+    mCameraPowerFile = new char[PROPERTY_VALUE_MAX];
+    if (!property_get(CAMERA_POWER_FILE, mCameraPowerFile, "")) {
+        LOGD("CameraHardware::PowerOn: no power_file set");
+        delete [] mCameraPowerFile;
+        mCameraPowerFile = 0;
+        return true;
+    }
+
     // power on camera
-    int handle = ::open(CAMERA_POWER,O_RDWR);
+    int handle = ::open(mCameraPowerFile,O_RDWR);
     if (handle >= 0) {
         ::write(handle,"1\n",2);
         ::close(handle);
     } else {
-        LOGE("Could not open %s for writing.", CAMERA_POWER);
+        LOGE("Could not open %s for writing.", mCameraPowerFile);
         return false;
     }
 
@@ -145,15 +154,19 @@ bool CameraHardware::PowerOff()
 {
     LOGD("CameraHardware::PowerOff: Power OFF camera.");
 
+    if (!mCameraPowerFile)
+        return true;
     // power on camera
-    int handle = ::open(CAMERA_POWER,O_RDWR);
+    int handle = ::open(mCameraPowerFile,O_RDWR);
     if (handle >= 0) {
         ::write(handle,"0\n",2);
         ::close(handle);
     } else {
-        LOGE("Could not open %s for writing.", CAMERA_POWER);
+        LOGE("Could not open %s for writing.", mCameraPowerFile);
         return false;
     }
+    delete [] mCameraPowerFile;
+    mCameraPowerFile = 0;
     return true;
 }
 
@@ -195,7 +208,8 @@ CameraHardware::CameraHardware(const hw_module_t* module) :
 
         mMsgEnabled(0),
         mCurrentPreviewFrame(0),
-        mCurrentRecordingFrame(0)
+        mCurrentRecordingFrame(0),
+        mCameraPowerFile(0)
 {
     /*
      * Initialize camera_device descriptor for this object.
