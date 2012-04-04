@@ -23,11 +23,12 @@
 
 #include "ExynosHWJpeg.h"
 
-namespace android {
+namespace android
+{
 
 ExynosHWJpeg::ExynosHWJpeg() :
-        _fd             (0),
-	_outBuff	(NULL)
+    _fd(0),
+    _outBuff(NULL)
 {
     memset(&_params, 0, sizeof(_params));
     LOGV("%s: Inited", __func__);
@@ -37,7 +38,7 @@ ExynosHWJpeg::ExynosHWJpeg() :
 
 ExynosHWJpeg::~ExynosHWJpeg()
 {
-    if(_fd > 0) {
+    if (_fd > 0) {
         LOGE_IF(api_jpeg_encode_deinit(_fd) != JPEG_OK,
                 "ERR(%s):Fail on api_jpeg_encode_deinit\n", __func__);
         _fd = 0;
@@ -156,7 +157,7 @@ int ExynosHWJpeg::setRotate(int r)
 }
 
 int ExynosHWJpeg::setGps(double latitude, double longitude,
-            unsigned int timestamp, short altitude)
+                         unsigned int timestamp, short altitude)
 {
     // TODO: no exif code here!
 #if 0
@@ -172,9 +173,9 @@ int ExynosHWJpeg::setGps(double latitude, double longitude,
 int ExynosHWJpeg::_reset(void)
 {
     int ret;
-    if(_fd > 0) {
+    if (_fd > 0) {
         ret = api_jpeg_encode_deinit(_fd);
-        if(ret != JPEG_OK) {
+        if (ret != JPEG_OK) {
             LOGE("ERR(%s):Fail on api_jpeg_encode_deinit\n", __func__);
             _fd = 0;
             return -1;
@@ -189,23 +190,23 @@ jpeg_stream_format ExynosHWJpeg::_getOutFormat(int inFmt)
 {
     jpeg_stream_format outFmt = JPEG_RESERVED;
 
-    switch(inFmt) {
-        case V4L2_PIX_FMT_NV12:
-        case V4L2_PIX_FMT_NV21:
-        case V4L2_PIX_FMT_NV12T:
-        case V4L2_PIX_FMT_YUV420:
-            outFmt = JPEG_420;
-            break;
+    switch (inFmt) {
+    case V4L2_PIX_FMT_NV12:
+    case V4L2_PIX_FMT_NV21:
+    case V4L2_PIX_FMT_NV12T:
+    case V4L2_PIX_FMT_YUV420:
+        outFmt = JPEG_420;
+        break;
 
-        case V4L2_PIX_FMT_YUYV:
-        case V4L2_PIX_FMT_UYVY:
-        case V4L2_PIX_FMT_YUV422P:
-            outFmt = JPEG_422;
-            break;
+    case V4L2_PIX_FMT_YUYV:
+    case V4L2_PIX_FMT_UYVY:
+    case V4L2_PIX_FMT_YUV422P:
+        outFmt = JPEG_422;
+        break;
 
-        defalut:
-            LOGE("%s: ExynosHWJpeg not support input format, %d", __func__, inFmt);
-            break;
+    defalut:
+        LOGE("%s: ExynosHWJpeg not support input format, %d", __func__, inFmt);
+        break;
     }
 
     LOGV("%s: inFmt=%d, outFmt=%d", __func__, inFmt, outFmt);

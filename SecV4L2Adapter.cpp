@@ -27,7 +27,8 @@
 
 #include "SecV4L2Adapter.h"
 
-namespace android {
+namespace android
+{
 
 #ifdef DEBUG_STR_PIXFMT
 const char SecV4L2Adapter::_strPixfmt_yuv420[]   = "YUV420";
@@ -151,8 +152,8 @@ int SecV4L2Adapter::enumBrightness(int ev)
 {
     int ev_enum = ev + EV_DEFAULT;
     if (0 > ev_enum || EV_MAX < ev_enum) {
-	    LOGE("%s: failed to convert given ev, %d to enum. rollback to default.",
-			    __func__, ev);
+        LOGE("%s: failed to convert given ev, %d to enum. rollback to default.",
+             __func__, ev);
         ev_enum = EV_DEFAULT;
     }
 
@@ -259,7 +260,7 @@ unsigned int SecV4L2Adapter::frameSize(int width, int height, int v4l2Pixfmt)
 {
     unsigned int bpp, size;
 
-    switch(v4l2Pixfmt) {
+    switch (v4l2Pixfmt) {
     case V4L2_PIX_FMT_NV12T:
         size = ALIGN(8 * 1024, ALIGN(128, width) + ALIGN(32, height)) +
                ALIGN(8 * 1024, ALIGN(128, width) + ALIGN(32, height >> 1));
@@ -294,7 +295,7 @@ unsigned int SecV4L2Adapter::frameSize(int width, int height, int v4l2Pixfmt)
 
 #ifdef DEBUG_STR_PIXFMT
     LOGV("%s: frames size for %dx%d,%s is %d", __func__,
-            width, height, _strPixfmt(v4l2Pixfmt), size);
+         width, height, _strPixfmt(v4l2Pixfmt), size);
 #endif
 
     return size;
@@ -332,15 +333,15 @@ const char *SecV4L2Adapter::_strPixfmt(int v4l2Pixfmt)
         break;
     }
 
-    LOGV ("%s: converted %d to %s", __func__, v4l2Pixfmt, strPixfmt);
+    LOGV("%s: converted %d to %s", __func__, v4l2Pixfmt, strPixfmt);
 
     return strPixfmt;
 }
 #endif
 
 SecV4L2Adapter::SecV4L2Adapter(const char *path, int ch) :
-    _fd     (0),
-    _index  (-1)
+    _fd(0),
+    _index(-1)
 {
     LOGI("%s", __func__);
 
@@ -375,7 +376,7 @@ int SecV4L2Adapter::_openCamera(const char *path)
     _fd = open(path, O_RDWR);
     if (0 >= _fd) {
         LOGE("ERR(%s):Cannot open %s (error : %s)\n",
-                __func__, path, strerror(errno));
+             __func__, path, strerror(errno));
         return -1;
     }
 
@@ -414,7 +415,7 @@ int SecV4L2Adapter::_setInputChann(int ch)
     }
 
     input.index = ch;
-    if(ioctl(_fd, VIDIOC_ENUMINPUT, &input) != 0) {
+    if (ioctl(_fd, VIDIOC_ENUMINPUT, &input) != 0) {
         LOGE("ERR(%s):No matching index found\n", __func__);
         return -1;
     }
@@ -449,7 +450,7 @@ int SecV4L2Adapter::setFmt(int w, int h, unsigned int fmt, int flag)
     while (ioctl(_fd, VIDIOC_ENUM_FMT, &fmtdesc) == 0) {
         if (fmtdesc.pixelformat == fmt) {
             LOGI("passed fmt = %d found pixel format[%d]: %s\n",
-                    fmt, fmtdesc.index, fmtdesc.description);
+                 fmt, fmtdesc.index, fmtdesc.description);
             found = 1;
             break;
         }
@@ -502,7 +503,7 @@ int SecV4L2Adapter::reqBufs(enum v4l2_buf_type t, int n)
     req.memory = V4L2_MEMORY_MMAP;
 
     ret = ioctl(_fd, VIDIOC_REQBUFS, &req);
-    if(ret < 0) {
+    if (ret < 0) {
         LOGE("ERR(%s):VIDIOC_REQBUFS failed\n", __func__);
         return -1;
     }
@@ -525,7 +526,7 @@ int SecV4L2Adapter::queryBuf(struct v4l2Buffer *buf, enum v4l2_buf_type type)
     v4l2_buf.index = 0;
 
     ret = ioctl(_fd, VIDIOC_QUERYBUF, &v4l2_buf);
-    if(ret < 0) {
+    if (ret < 0) {
         LOGE("ERR(%s):VIDIOC_QUERYBUF failed\n", __func__);
         return -1;
     }
@@ -533,14 +534,14 @@ int SecV4L2Adapter::queryBuf(struct v4l2Buffer *buf, enum v4l2_buf_type type)
     buf->length = v4l2_buf.length;
 
     if ((buf->start = (char *)mmap(0, v4l2_buf.length,
-                    PROT_READ | PROT_WRITE, MAP_SHARED,
-                    _fd, v4l2_buf.m.offset)) < 0) {
-        LOGE("%s %d] mmap() failed\n",__func__, __LINE__);
+                                   PROT_READ | PROT_WRITE, MAP_SHARED,
+                                   _fd, v4l2_buf.m.offset)) < 0) {
+        LOGE("%s %d] mmap() failed\n", __func__, __LINE__);
         return -1;
     }
 
     LOGV("buf->start = %p v4l2_buf.length = %d",
-            buf->start, v4l2_buf.length);
+         buf->start, v4l2_buf.length);
 
     return 0;
 }
@@ -555,13 +556,13 @@ int SecV4L2Adapter::queryBufs(struct v4l2Buffer *bufs, enum v4l2_buf_type type, 
         return -1;
     }
 
-    for(i = 0; i < n; i++) {
+    for (i = 0; i < n; i++) {
         v4l2_buf.type = type;
         v4l2_buf.memory = V4L2_MEMORY_MMAP;
         v4l2_buf.index = i;
 
         ret = ioctl(_fd, VIDIOC_QUERYBUF, &v4l2_buf);
-        if(ret < 0) {
+        if (ret < 0) {
             LOGE("ERR(%s):VIDIOC_QUERYBUF failed\n", __func__);
             return -1;
         }
@@ -571,14 +572,14 @@ int SecV4L2Adapter::queryBufs(struct v4l2Buffer *bufs, enum v4l2_buf_type type, 
         if (n == 1) {
             bufs[i].length = v4l2_buf.length;
             if ((bufs[i].start = (char *)mmap(0, v4l2_buf.length,
-                            PROT_READ | PROT_WRITE, MAP_SHARED,
-                    _fd, v4l2_buf.m.offset)) < 0) {
-                LOGE("%s %d] mmap() failed\n",__func__, __LINE__);
+                                              PROT_READ | PROT_WRITE, MAP_SHARED,
+                                              _fd, v4l2_buf.m.offset)) < 0) {
+                LOGE("%s %d] mmap() failed\n", __func__, __LINE__);
                 return -1;
             }
 
             LOGV("bufs[%d].start = %p v4l2_buf.length = %d",
-                    i, bufs[i].start, v4l2_buf.length);
+                 i, bufs[i].start, v4l2_buf.length);
         }
     }
 
@@ -670,14 +671,14 @@ int SecV4L2Adapter::blk_dqbuf(void)
         return dqbuf();
     } else {
         index = v4l2_buf.index;
-        while(ret == 0) {
+        while (ret == 0) {
             ret = ioctl(_fd, VIDIOC_DQBUF, &v4l2_buf);
             if (ret == 0) {
-                LOGV("VIDIOC_DQBUF is not still empty %d",v4l2_buf.index);
+                LOGV("VIDIOC_DQBUF is not still empty %d", v4l2_buf.index);
                 qbuf(index);
                 index = v4l2_buf.index;
             } else {
-                LOGV("VIDIOC_DQBUF is empty now %d ",index);
+                LOGV("VIDIOC_DQBUF is empty now %d ", index);
                 return index;
             }
         }
@@ -846,7 +847,7 @@ int SecV4L2Adapter::closeBuf(struct v4l2Buffer *buf)
     if (buf->start) {
         munmap(buf->start, buf->length);
         LOGV("munmap():virt. start = 0x%x, size = %d\n",
-                (unsigned int) buf->start, buf->length);
+             (unsigned int) buf->start, buf->length);
         buf->start = NULL;
     }
 
@@ -861,7 +862,7 @@ int SecV4L2Adapter::closeBufs(struct v4l2Buffer *bufs)
         if (bufs[i].start) {
             munmap(bufs[i].start, bufs[i].length);
             LOGV("munmap():virt. addr[%d]: 0x%x size = %d\n",
-                    i, (unsigned int) bufs[i].start, bufs[i].length);
+                 i, (unsigned int) bufs[i].start, bufs[i].length);
             bufs[i].start = NULL;
         }
     }

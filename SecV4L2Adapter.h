@@ -23,7 +23,8 @@
 
 #undef DEBUG_STR_PIXFMT
 
-namespace android {
+namespace android
+{
 
 #define MAX_BUFFERS	(8)
 

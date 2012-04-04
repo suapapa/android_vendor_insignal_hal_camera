@@ -30,7 +30,8 @@ using namespace android;
                 __func__, __LINE__, #T);        \
     }
 
-namespace android {
+namespace android
+{
 
 // ======================================================================
 // Camera controls
@@ -57,7 +58,7 @@ unsigned long measure_time(struct timeval *start, struct timeval *stop)
 
 void SecCamera::releaseRecordFrame(int i)
 {
-    LOGV("releaseframe : (%d)",i);
+    LOGV("releaseframe : (%d)", i);
 
 #ifdef DUAL_PORT_RECORDING
     int ret = _v4l2Rec->qbuf(i);
@@ -70,20 +71,20 @@ void SecCamera::releaseRecordFrame(int i)
 // Constructor & Destructor
 
 SecCamera::SecCamera(const char *camPath, const char *recPath, int ch) :
-        _isInited               (false),
-        _previewWidth           (0),
-        _previewHeight          (0),
-        _previewPixfmt          (-1),
-        _previewFrameSize       (0),
-        _snapshotWidth          (0),
-        _snapshotHeight         (0),
-        _snapshotPixfmt         (-1),
-        _snapshotFrameSize      (0),
-        _isPreviewOn            (false),
-        _isRecordOn             (false),
-        _v4l2Cam		(NULL),
-        _v4l2Rec                (NULL),
-        _jpeg                   (NULL)
+    _isInited(false),
+    _previewWidth(0),
+    _previewHeight(0),
+    _previewPixfmt(-1),
+    _previewFrameSize(0),
+    _snapshotWidth(0),
+    _snapshotHeight(0),
+    _snapshotPixfmt(-1),
+    _snapshotFrameSize(0),
+    _isPreviewOn(false),
+    _isRecordOn(false),
+    _v4l2Cam(NULL),
+    _v4l2Rec(NULL),
+    _jpeg(NULL)
 {
     LOGV("%s()", __func__);
 
@@ -108,7 +109,7 @@ SecCamera::~SecCamera()
 {
     LOGV("%s()", __func__);
 
-    if(!_isInited) {
+    if (!_isInited) {
         LOGV("%s: Can't destroy! SecCamera not inited!", __func__);
         return;
     }
@@ -127,14 +128,14 @@ SecCamera::~SecCamera()
 
 void SecCamera::_release(void)
 {
-    if(_jpeg)
+    if (_jpeg)
         delete _jpeg;
 
-    if(_v4l2Cam)
+    if (_v4l2Cam)
         delete _v4l2Cam;
 
 #ifdef DUAL_PORT_RECORDING
-    if(_v4l2Rec)
+    if (_v4l2Rec)
         delete _v4l2Rec;
 #endif
 
@@ -158,7 +159,7 @@ int SecCamera::getFd(void)
 int SecCamera::startPreview(void)
 {
     // aleady started
-    if(_isPreviewOn == true) {
+    if (_isPreviewOn == true) {
         LOGE("ERR(%s):Preview was already started\n", __func__);
         return 0;
     }
@@ -203,7 +204,7 @@ int SecCamera::stopPreview(void)
 {
     LOGV("++%s() \n", __func__);
 
-    if(_isPreviewOn == false)
+    if (_isPreviewOn == false)
         return 0;
 
     _v4l2Cam->closeBufs(_previewBufs);
@@ -224,7 +225,7 @@ int SecCamera::startRecord(void)
     LOGI("++%s() \n", __func__);
     int ret = 0;
     // aleady started
-    if(_isRecordOn == true) {
+    if (_isRecordOn == true) {
         LOGE("ERR(%s):Preview was already started\n", __func__);
         return 0;
     }
@@ -268,7 +269,7 @@ int SecCamera::stopRecord(void)
 {
     LOGV("%s :", __func__);
 
-    if(_isRecordOn == false)
+    if (_isRecordOn == false)
         return 0;
 
     _v4l2Rec->closeBufs(_recordBufs);
@@ -298,7 +299,7 @@ int SecCamera::getRecordBuffer(int *index, unsigned int *addrY, unsigned int *ad
     _v4l2Rec->waitFrame();
     *index = _v4l2Rec->dqbuf();
 #endif
-    if(!(0 <= *index && *index < MAX_BUFFERS)) {
+    if (!(0 <= *index && *index < MAX_BUFFERS)) {
         LOGE("ERR(%s):wrong index = %d\n", __func__, *index);
         return -1;
     }
@@ -334,7 +335,7 @@ int SecCamera::getPreviewBuffer(int *index, unsigned int *addrY, unsigned int *a
 #else
     *index = _v4l2Cam->blk_dqbuf();
 #endif
-    if(!(0 <= *index && *index < MAX_BUFFERS)) {
+    if (!(0 <= *index && *index < MAX_BUFFERS)) {
         LOGE("ERR(%s):wrong index = %d\n", __func__, *index);
         return -1;
     }
@@ -353,10 +354,10 @@ int SecCamera::setPreviewFormat(int width, int height, const char *strPixfmt)
     _previewHeight = height;
     _previewPixfmt = _v4l2Cam->nPixfmt(strPixfmt);
     _previewFrameSize = _v4l2Cam->frameSize(_previewWidth, _previewHeight,
-            _previewPixfmt);
+                                            _previewPixfmt);
 
     LOGI("previewFormat=%dx%d(%s), frameSize=%d",
-            width, height, strPixfmt, _previewFrameSize);
+         width, height, strPixfmt, _previewFrameSize);
 
     return _previewFrameSize > 0 ? 0 : -1;
 }
@@ -391,11 +392,11 @@ int SecCamera::startSnapshot(void)
     LOG_TIME_END(1);
 
     LOG_CAMERA("%s: stopPreview(%lu), prepare(%lu) us",
-            __func__, LOG_TIME(0), LOG_TIME(1));
+               __func__, LOG_TIME(0), LOG_TIME(1));
 
     return 0;
 }
-    // ------------------------------------------------------------------
+// ------------------------------------------------------------------
 
 int SecCamera::getSnapshot(int xth)
 {
@@ -421,7 +422,7 @@ int SecCamera::getSnapshot(int xth)
     LOG_TIME_END(1);
 
     LOG_CAMERA("%s: get frame after skip %d(%lu), stopStream(%lu)",
-            __func__, xth, LOG_TIME(0), LOG_TIME(1));
+               __func__, xth, LOG_TIME(0), LOG_TIME(1));
 
     return 0;
 }
@@ -435,7 +436,7 @@ int SecCamera::getRawSnapshot(unsigned char *buffer, unsigned int size)
 
     if (size < _captureBuf.length) {
         LOGE("%s: buffer size, %d is too small! for snapshot size, %d",
-                __func__, size, _captureBuf.length);
+             __func__, size, _captureBuf.length);
     } else {
         size = _captureBuf.length;
     }
@@ -454,14 +455,14 @@ int SecCamera::setSnapshotFormat(int width, int height, const char *strPixfmt)
     /* TODO: send snapshot format to dirver which have context change */
 
     _snapshotFrameSize = _v4l2Cam->frameSize(_snapshotWidth, _snapshotHeight,
-            _snapshotPixfmt);
+                         _snapshotPixfmt);
 
     int ret = _jpeg->setImgFormat(_snapshotWidth, _snapshotHeight,
-		    _snapshotPixfmt);
+                                  _snapshotPixfmt);
     CHECK(ret == 0);
 
     LOGI("snapshotFormat=%dx%d(%s), frameSize=%d",
-            width, height, strPixfmt, _snapshotFrameSize);
+         width, height, strPixfmt, _snapshotFrameSize);
 
     return _snapshotFrameSize > 0 ? 0 : -1;
 }
@@ -477,7 +478,7 @@ unsigned int SecCamera::getSnapshotFrameSize(void)
 int SecCamera::startAutoFocus(void)
 {
     int ret = _v4l2Cam->setCtrl(V4L2_CID_CAMERA_SET_AUTO_FOCUS,
-            AUTO_FOCUS_ON);
+                                AUTO_FOCUS_ON);
 
     LOGE_IF(0 > ret, "%s:Failed to start auto focus!! ret=%d",
             __func__, ret);
@@ -488,7 +489,7 @@ int SecCamera::startAutoFocus(void)
 int SecCamera::abortAutoFocus(void)
 {
     int ret = _v4l2Cam->setCtrl(V4L2_CID_CAMERA_SET_AUTO_FOCUS,
-            AUTO_FOCUS_OFF);
+                                AUTO_FOCUS_OFF);
 
     LOGE_IF(0 > ret, "%s:Failed to abort auto focus!! ret=%d",
             __func__, ret);
@@ -500,7 +501,7 @@ bool SecCamera::getAutoFocusResult(void)
 {
     bool afDone = false;
     int ret = _v4l2Cam->getCtrl(V4L2_CID_CAMERA_AUTO_FOCUS_RESULT);
-    switch(ret) {
+    switch (ret) {
     case 0x01:
         LOGV("%s: af success.", __func__);
         afDone = true;
@@ -539,11 +540,11 @@ int SecCamera::setSceneMode(const char *strSceneMode)
 {
     _parms.scene_mode = _v4l2Cam->enumSceneMode(strSceneMode);
 
-    if(!_isPreviewOn)
+    if (!_isPreviewOn)
         return 0;
 
     int ret = _v4l2Cam->setCtrl(V4L2_CID_CAMERA_SCENE_MODE,
-            _parms.scene_mode);
+                                _parms.scene_mode);
 
     LOGE_IF(0 > ret, "%s:Failed to set scene-mode, %s!! ret=%d",
             __func__, strSceneMode, ret);
@@ -555,11 +556,11 @@ int SecCamera::setWhiteBalance(const char *strWhiteBalance)
 {
     _parms.white_balance = _v4l2Cam->enumWB(strWhiteBalance);
 
-    if(!_isPreviewOn)
+    if (!_isPreviewOn)
         return 0;
 
     int ret = _v4l2Cam->setCtrl(V4L2_CID_CAMERA_WHITE_BALANCE,
-            _parms.white_balance);
+                                _parms.white_balance);
 
     LOGE_IF(0 > ret, "%s:Failed to set white-balance, %s!! ret=%d",
             __func__, strWhiteBalance, ret);
@@ -571,11 +572,11 @@ int SecCamera::setEffect(const char *strEffect)
 {
     _parms.effects = _v4l2Cam->enumEffect(strEffect);
 
-    if(!_isPreviewOn)
+    if (!_isPreviewOn)
         return 0;
 
     int ret = _v4l2Cam->setCtrl(V4L2_CID_CAMERA_EFFECT,
-            _parms.effects);
+                                _parms.effects);
 
     LOGE_IF(0 > ret, "%s:Failed to set effects, %s!! ret=%d",
             __func__, strEffect, ret);
@@ -589,7 +590,7 @@ int SecCamera::setFlashMode(const char *strFlashMode)
 
     LOGV("setting flash-mode set to %s...", strFlashMode);
 
-    switch(_parms.flash_mode) {
+    switch (_parms.flash_mode) {
     case FLASH_MODE_TORCH:
         return 0;
 
@@ -602,11 +603,11 @@ int SecCamera::setFlashMode(const char *strFlashMode)
         break;
     }
 
-    if(!_isPreviewOn)
+    if (!_isPreviewOn)
         return 0;
 
     int ret = _v4l2Cam->setCtrl(V4L2_CID_CAMERA_FLASH_MODE,
-            _parms.flash_mode);
+                                _parms.flash_mode);
 
     LOGE_IF(0 > ret, "%s:Failed to set flash-mode, %s!! ret=%d",
             __func__, strFlashMode, ret);
@@ -618,11 +619,11 @@ int SecCamera::setBrightness(int brightness)
 {
     _parms.brightness = _v4l2Cam->enumBrightness(brightness);
 
-    if(!_isPreviewOn)
+    if (!_isPreviewOn)
         return 0;
 
     int ret = _v4l2Cam->setCtrl(V4L2_CID_CAMERA_BRIGHTNESS,
-            _parms.brightness);
+                                _parms.brightness);
 
     LOGE_IF(0 > ret, "%s:Failed to set brightness, %d!! ret=%d",
             __func__, brightness, ret);
@@ -634,11 +635,11 @@ int SecCamera::setFocusMode(const char *strFocusMode)
 {
     _parms.focus_mode = _v4l2Cam->enumFocusMode(strFocusMode);
 
-    if(!_isPreviewOn)
+    if (!_isPreviewOn)
         return 0;
 
     int ret = _v4l2Cam->setCtrl(V4L2_CID_CAMERA_FOCUS_MODE,
-            _parms.focus_mode);
+                                _parms.focus_mode);
 
     LOGE_IF(0 > ret, "%s:Failed to set focus-mode, %s!! ret=%d",
             __func__, strFocusMode, ret);
@@ -673,7 +674,7 @@ void SecCamera::_initParms(void)
 int SecCamera::getJpegSnapshot(unsigned char *buffer, unsigned int size)
 {
     _jpeg->doCompress((unsigned char *)_captureBuf.start,
-            _captureBuf.length);
+                      _captureBuf.length);
 
     return _jpeg->copyOutput(buffer, size);
 }

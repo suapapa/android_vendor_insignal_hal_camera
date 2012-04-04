@@ -25,18 +25,20 @@
 #include <binder/MemoryHeapBase.h>
 #include <utils/threads.h>
 
-namespace android {
+namespace android
+{
 
-class SecCameraHardware : public CameraHardwareInterface {
+class SecCameraHardware : public CameraHardwareInterface
+{
 
 public:
     virtual sp<IMemoryHeap> getPreviewHeap() const;
     virtual sp<IMemoryHeap> getRawHeap() const;
 
     virtual void        setCallbacks(notify_callback notify_cb,
-            data_callback data_cb,
-            data_callback_timestamp data_cb_timestamp,
-            void* user);
+                                     data_callback data_cb,
+                                     data_callback_timestamp data_cb_timestamp,
+                                     void *user);
 
     virtual void        enableMsgType(int32_t msgType);
     virtual void        disableMsgType(int32_t msgType);
@@ -62,7 +64,7 @@ public:
     virtual status_t    takePicture();
     virtual status_t    cancelPicture();
 
-    virtual status_t    setParameters(const CameraParameters& params);
+    virtual status_t    setParameters(const CameraParameters &params);
     virtual CameraParameters  getParameters() const;
     virtual status_t    sendCommand(int32_t command,
                                     int32_t arg1, int32_t arg2);
@@ -76,12 +78,13 @@ private:
     SecCameraHardware(int cameraId);
     virtual    ~SecCameraHardware();
 
-    class PreviewThread : public Thread {
+    class PreviewThread : public Thread
+    {
         SecCameraHardware *mHardware;
     public:
         PreviewThread(SecCameraHardware *hw):
-        Thread(false),
-        mHardware(hw) { }
+            Thread(false),
+            mHardware(hw) { }
         virtual void onFirstRef() {
             run("CameraPreviewThread", PRIORITY_URGENT_DISPLAY);
         }
@@ -91,24 +94,26 @@ private:
         }
     };
 
-    class PictureThread : public Thread {
+    class PictureThread : public Thread
+    {
         SecCameraHardware *mHardware;
     public:
         PictureThread(SecCameraHardware *hw):
-        Thread(false),
-        mHardware(hw) { }
+            Thread(false),
+            mHardware(hw) { }
         virtual bool threadLoop() {
             mHardware->pictureThread();
             return false;
         }
     };
 
-    class AutoFocusThread : public Thread {
+    class AutoFocusThread : public Thread
+    {
         SecCameraHardware *mHardware;
     public:
         AutoFocusThread(SecCameraHardware *hw):
-        Thread(false),
-        mHardware(hw) { }
+            Thread(false),
+            mHardware(hw) { }
         virtual void onFirstRef() {
             run("CameraAutoFocusThread", PRIORITY_DEFAULT);
         }
@@ -162,7 +167,7 @@ private:
     notify_callback     mNotifyCb;
     data_callback       mDataCb;
     data_callback_timestamp mDataCbTimestamp;
-    void *              mCallbackCookie;
+    void               *mCallbackCookie;
 
     int32_t             mMsgEnabled;
 
@@ -196,7 +201,7 @@ private:
     sp<PictureThread>   mPictureThread;
     int                 pictureThread();
 
-    int        m_getGpsInfo(CameraParameters * camParams, gps_info * gps);
+    int        m_getGpsInfo(CameraParameters *camParams, gps_info *gps);
 };
 
 }; // namespace android

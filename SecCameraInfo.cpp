@@ -18,7 +18,8 @@
 #include <camera/Camera.h>
 #include "SecCameraHardware.h"
 
-namespace android {
+namespace android
+{
 
 static CameraInfo sCameraInfo[] = {
     {

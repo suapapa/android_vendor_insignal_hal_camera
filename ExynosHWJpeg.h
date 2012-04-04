@@ -20,7 +20,8 @@
 #include "jpeg_api.h"
 #include "JpegInterface.h"
 
-namespace android {
+namespace android
+{
 
 class ExynosHWJpeg : public JpegInterface
 {

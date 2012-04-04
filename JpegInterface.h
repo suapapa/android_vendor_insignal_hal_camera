@@ -17,9 +17,11 @@
 #ifndef __ANDROID_HARDWARE_LIBCAMERA_JPEG_INTERFACE_H__
 #define __ANDROID_HARDWARE_LIBCAMERA_JPEG_INTERFACE_H__
 
-namespace android {
+namespace android
+{
 
-class JpegInterface {
+class JpegInterface
+{
 public:
     virtual ~JpegInterface() { }
     virtual int setImgFormat(int w, int h, int f) = 0;

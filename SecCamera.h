@@ -23,7 +23,8 @@
 #include "SecV4L2Adapter.h"
 #include "JpegInterface.h"
 
-namespace android {
+namespace android
+{
 
 #define DUAL_PORT_RECORDING //Define this if 2 fimc ports are needed for recording.
 
@@ -59,7 +60,8 @@ namespace android {
 #endif
 
 
-class SecCamera {
+class SecCamera
+{
 public:
     SecCamera(const char *camPath, const char *recPath, int ch);
     ~SecCamera();
@@ -67,11 +69,11 @@ public:
     int                 flagCreate(void) const;
 
     int                 startPreview(void);
-    int                 stopPreview (void);
+    int                 stopPreview(void);
     void                pausePreview();
 #ifdef DUAL_PORT_RECORDING
     int                 startRecord(void);
-    int                 stopRecord (void);
+    int                 stopRecord(void);
     int                 getRecordBuffer(int *index, unsigned int *addrY, unsigned int *addrC);
     void                releaseRecordFrame(int i);
 #endif

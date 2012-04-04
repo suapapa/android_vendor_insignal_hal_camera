@@ -30,7 +30,8 @@
 #define ALL_BUFFERS_FLUSHED     -66
 #endif
 
-namespace android {
+namespace android
+{
 
 struct ADDRS {
     unsigned int addr_y;
@@ -39,29 +40,29 @@ struct ADDRS {
 };
 
 SecCameraHardware::SecCameraHardware(int cameraId)
-                  : mParameters(),
-                    mPreviewHeap(NULL),
-                    mRawHeap(NULL),
-                    mRecordHeap(NULL),
-                    mSecCamera(NULL),
-                    mRecordRunning(false),
-                    mCaptureInProgress(false),
-                    mPreviewFrameRateMicrosec(33333),
+    : mParameters(),
+      mPreviewHeap(NULL),
+      mRawHeap(NULL),
+      mRecordHeap(NULL),
+      mSecCamera(NULL),
+      mRecordRunning(false),
+      mCaptureInProgress(false),
+      mPreviewFrameRateMicrosec(33333),
 #if defined(BOARD_USES_CAMERA_OVERLAY)
-                    mOverlayBufferIdx(0),
+      mOverlayBufferIdx(0),
 #endif
-                    mNotifyCb(0),
-                    mDataCb(0),
-                    mDataCbTimestamp(0),
-                    mCallbackCookie(0),
-                    mMsgEnabled(0)
+      mNotifyCb(0),
+      mDataCb(0),
+      mDataCbTimestamp(0),
+      mCallbackCookie(0),
+      mMsgEnabled(0)
 {
     LOGV("%s :", __func__);
 
     const char *camPath = CAMERA_DEV_NAME;
     const char *recPath = CAMERA_DEV_NAME2;
     mSecCamera = new SecCamera(camPath, recPath, cameraId);
-    if(mSecCamera->flagCreate() == 0) {
+    if (mSecCamera->flagCreate() == 0) {
         LOGE("%s: Failed to create SecCamera!!", __func__);
         if (mSecCamera) {
             delete mSecCamera;
@@ -91,50 +92,50 @@ void SecCameraHardware::_initParams(int cameraId)
 {
     LOGV("++%s :", __func__);
 
-    if(mSecCamera == NULL) {
+    if (mSecCamera == NULL) {
         LOGE("ERR(%s):mSecCamera object is NULL", __func__);
         return;
     }
 
     //TODO: init parm string should be defined outside from here!
     String8 strCamParam(
-            "preview-size=720x480;"
-            "preview-size-values=1280x720,720x480,720x480,640x480,320x240,176x144;"
-            "preview-format=yuv420sp;"
-            "preview-format-values=yuv420sp;"
-            "preview-frame-rate=30;"
-            "preview-frame-rate-values=7,15,30;"
-            "preview-fps-range=15000,30000;"
-            "preview-fps-range-values=(15000,30000);"
-            "picture-size=2560x1920;"
-            "picture-size-values=3264x2448,3264x1968,"
-                "2560x1920,2048x1536,2048x1536,2048x1232,"
-                "1600x1200,1600x960,"
-                "800x480,640x480;"
-            "picture-format=jpeg;"
-            "picture-format-values=jpeg;"
-            "jpeg-thumbnail-width=320;"
-            "jpeg-thumbnail-height=240;"
-            "jpeg-thumbnail-size-values=320x240,0x0;"
-            "jpeg-thumbnail-quality=100;"
-            "jpeg-quality=100;"
-            "rotation=0;"
-            "min-exposure-compensation=-2;"
-            "max-exposure-compensation=2;"
-            "exposure-compensation-step=1;"
-            "exposure-compensation=0;"
-            "whitebalance=auto;"
-            "whitebalance-values=auto,fluorescent,warm-flurescent,daylight,cloudy-daylight;"
-            "effect=none;"
-            "effect-values=none,mono,negative,sepia;"
-            "antibanding=auto;"
-            "antibanding-values=auto,50hz,60hz,off;"
-            "scene-mode=auto;"
-            "scene-mode-values=auto,portrait,night,landscape,sports,party,snow,sunset,fireworks,candlelight;"
-            "focus-mode=auto;"
-            "focus-mode-values=auto,macro;"
-            "video-frame-format=yuv420sp;"
-            "focal-length=343"
+        "preview-size=720x480;"
+        "preview-size-values=1280x720,720x480,720x480,640x480,320x240,176x144;"
+        "preview-format=yuv420sp;"
+        "preview-format-values=yuv420sp;"
+        "preview-frame-rate=30;"
+        "preview-frame-rate-values=7,15,30;"
+        "preview-fps-range=15000,30000;"
+        "preview-fps-range-values=(15000,30000);"
+        "picture-size=2560x1920;"
+        "picture-size-values=3264x2448,3264x1968,"
+        "2560x1920,2048x1536,2048x1536,2048x1232,"
+        "1600x1200,1600x960,"
+        "800x480,640x480;"
+        "picture-format=jpeg;"
+        "picture-format-values=jpeg;"
+        "jpeg-thumbnail-width=320;"
+        "jpeg-thumbnail-height=240;"
+        "jpeg-thumbnail-size-values=320x240,0x0;"
+        "jpeg-thumbnail-quality=100;"
+        "jpeg-quality=100;"
+        "rotation=0;"
+        "min-exposure-compensation=-2;"
+        "max-exposure-compensation=2;"
+        "exposure-compensation-step=1;"
+        "exposure-compensation=0;"
+        "whitebalance=auto;"
+        "whitebalance-values=auto,fluorescent,warm-flurescent,daylight,cloudy-daylight;"
+        "effect=none;"
+        "effect-values=none,mono,negative,sepia;"
+        "antibanding=auto;"
+        "antibanding-values=auto,50hz,60hz,off;"
+        "scene-mode=auto;"
+        "scene-mode-values=auto,portrait,night,landscape,sports,party,snow,sunset,fireworks,candlelight;"
+        "focus-mode=auto;"
+        "focus-mode-values=auto,macro;"
+        "video-frame-format=yuv420sp;"
+        "focal-length=343"
     );
     mParameters.unflatten(strCamParam);
     //mParameters.dump();
@@ -162,9 +163,9 @@ sp<IMemoryHeap> SecCameraHardware::getRawHeap() const
 }
 
 void SecCameraHardware::setCallbacks(notify_callback notify_cb,
-                                      data_callback data_cb,
-                                      data_callback_timestamp data_cb_timestamp,
-                                      void* user)
+                                     data_callback data_cb,
+                                     data_callback_timestamp data_cb_timestamp,
+                                     void *user)
 {
     mNotifyCb        = notify_cb;
     mDataCb          = data_cb;
@@ -299,7 +300,7 @@ int SecCameraHardware::previewThread()
         addr.addr_cbcr = phyCAddr;
         addr.buf_idx = mOverlayBufferIdx;
 
-        ret = mOverlay->queueBuffer((void*)&addr);
+        ret = mOverlay->queueBuffer((void *)&addr);
         if (ret == ALL_BUFFERS_FLUSHED) {
         } else if (ret == -1) {
             LOGE("ERR(%s):overlay queueBuffer fail", __func__);
@@ -311,15 +312,15 @@ int SecCameraHardware::previewThread()
 #endif
 
     // Notify the client of a new frame.
-    if(mDataCb && (mMsgEnabled & CAMERA_MSG_PREVIEW_FRAME)) {
+    if (mDataCb && (mMsgEnabled & CAMERA_MSG_PREVIEW_FRAME)) {
         sp<MemoryBase> previewBuffer = new MemoryBase(mPreviewHeap,
                 mPreviewFrameSize * index, mPreviewFrameSize);
-        if(previewBuffer != 0)
+        if (previewBuffer != 0)
             mDataCb(CAMERA_MSG_PREVIEW_FRAME, previewBuffer, mCallbackCookie);
     }
 
     Mutex::Autolock lock(mRecordLock);
-    if(mRecordRunning == true) {
+    if (mRecordRunning == true) {
         int ret = mSecCamera->getRecordBuffer(&index, &phyYAddr, &phyCAddr);
         if (0 > ret) {
             LOGE("%s: Failed to get PhyAddr for Record!", __func__);
@@ -335,7 +336,7 @@ int SecCameraHardware::previewThread()
                 index * sizeof(struct ADDRS), sizeof(struct ADDRS));
 
         // Notify the client of a new frame.
-        if(mDataCbTimestamp && (mMsgEnabled & CAMERA_MSG_VIDEO_FRAME)) {
+        if (mDataCbTimestamp && (mMsgEnabled & CAMERA_MSG_VIDEO_FRAME)) {
             LOGV("recording time = %lld us ", timestamp);
             mDataCbTimestamp(timestamp, CAMERA_MSG_VIDEO_FRAME, recordBuffer, mCallbackCookie);
         } else {
@@ -365,19 +366,19 @@ status_t SecCameraHardware::startPreview()
 
     //mSecCamera->stopPreview();
     int ret  = mSecCamera->startPreview();
-    if(ret < 0) {
+    if (ret < 0) {
         LOGE("ERR(%s):Fail on mSecCamera->startPreview()", __func__);
         return UNKNOWN_ERROR;
     }
 
-    if(mPreviewHeap != NULL)
+    if (mPreviewHeap != NULL)
         mPreviewHeap.clear();
 
     mPreviewFrameSize = mSecCamera->getPreviewFrameSize();
 
     unsigned int previewHeapSize = mPreviewFrameSize * kBufferCount;
     mPreviewHeap = new MemoryHeapBase((int)mSecCamera->getFd(),
-            (size_t)(previewHeapSize), (uint32_t)0);
+                                      (size_t)(previewHeapSize), (uint32_t)0);
 
     mPreviewRunning = true;
     mPreviewCondition.signal();
@@ -432,7 +433,7 @@ status_t SecCameraHardware::startRecording()
     }
 
     if (mRecordRunning == false) {
-        if(mSecCamera->startRecord() < 0) {
+        if (mSecCamera->startRecord() < 0) {
             LOGE("ERR(%s):Fail on mSecCamera->startRecord()", __func__);
             return UNKNOWN_ERROR;
         }
@@ -448,7 +449,7 @@ void SecCameraHardware::stopRecording()
     Mutex::Autolock lock(mRecordLock);
 
     if (mRecordRunning == true) {
-        if(mSecCamera->stopRecord() < 0) {
+        if (mSecCamera->stopRecord() < 0) {
             LOGE("ERR(%s):Fail on mSecCamera->stopRecord()", __func__);
             return;
         }
@@ -548,7 +549,7 @@ int SecCameraHardware::pictureThread()
 
     LOGV("doing snapshot...");
     ret = mSecCamera->startSnapshot();
-    if(ret != 0) {
+    if (ret != 0) {
         LOGE("%s: Failed to do snapshot!", __func__);
         ret = UNKNOWN_ERROR;
         goto out;
@@ -559,29 +560,29 @@ int SecCameraHardware::pictureThread()
 
     mSecCamera->getSnapshot();
 
-    if((mMsgEnabled & CAMERA_MSG_RAW_IMAGE) && mDataCb) {
+    if ((mMsgEnabled & CAMERA_MSG_RAW_IMAGE) && mDataCb) {
         LOGV("getting raw snapshot...");
         unsigned char *rawAddr = (unsigned char *)mRawHeap->base();
         int rawSize = mRawHeap->getSize();
         mSecCamera->getRawSnapshot(rawAddr, rawSize);
-	// TODO: send raw image via mDataCb
+        // TODO: send raw image via mDataCb
     }
 
     LOGV("copying meta datas...");
-    if(0 <= m_getGpsInfo(&mParameters, &mGpsInfo)) {
-        if(mSecCamera->setGpsInfo(mGpsInfo.latitude,  mGpsInfo.longitude,
-                    mGpsInfo.timestamp, mGpsInfo.altitude) < 0) {
+    if (0 <= m_getGpsInfo(&mParameters, &mGpsInfo)) {
+        if (mSecCamera->setGpsInfo(mGpsInfo.latitude,  mGpsInfo.longitude,
+                                   mGpsInfo.timestamp, mGpsInfo.altitude) < 0) {
             LOGE("%s::setGpsInfo fail.. but making jpeg is progressing\n", __func__);
         }
     }
 
-    if(mDataCb && (mMsgEnabled & CAMERA_MSG_COMPRESSED_IMAGE)) {
+    if (mDataCb && (mMsgEnabled & CAMERA_MSG_COMPRESSED_IMAGE)) {
         LOGV("getting jpeg snapshot...");
         // TODO: the heap size too enough for jpeg..
         int jpegHeapSize = mSecCamera->getSnapshotFrameSize();
         sp<MemoryHeapBase> jpegHeap = new MemoryHeapBase(jpegHeapSize);
         int jpegSize = mSecCamera->getJpegSnapshot((unsigned char *)jpegHeap->base(),
-                jpegHeapSize);
+                       jpegHeapSize);
 
         // TODO: add exif and thumbanil in jpeg
         sp<MemoryBase> jpegMem = new MemoryBase(jpegHeap, 0, jpegSize);
@@ -626,7 +627,7 @@ status_t SecCameraHardware::cancelPicture()
 }
 
 bool SecCameraHardware::_isParamUpdated(const CameraParameters &newParams,
-        const char *key, const char *newValue) const
+                                        const char *key, const char *newValue) const
 {
     if (NULL == newValue) {
         LOGV("%s: no value to compare!!", __func__);
@@ -648,9 +649,9 @@ bool SecCameraHardware::_isParamUpdated(const CameraParameters &newParams,
 }
 
 bool SecCameraHardware::_isParamUpdated(const CameraParameters &newParams,
-        const char *key, int newValue) const
+                                        const char *key, int newValue) const
 {
-    if(NULL == mParameters.get(key)) {
+    if (NULL == mParameters.get(key)) {
         LOGV("%s: mParameters has no key, %s", __func__, key);
         return false;
     }
@@ -665,7 +666,7 @@ bool SecCameraHardware::_isParamUpdated(const CameraParameters &newParams,
     return false;
 }
 
-status_t SecCameraHardware::setParameters(const CameraParameters& params)
+status_t SecCameraHardware::setParameters(const CameraParameters &params)
 {
     LOGV("++%s :", __func__);
 
@@ -684,7 +685,7 @@ status_t SecCameraHardware::setParameters(const CameraParameters& params)
     if (mCaptureInProgress) {
         mStateLock.unlock();
         LOGW("%s : capture in progress, not allowed", __func__);
-	params.dump();
+        params.dump();
         return NO_ERROR;
     }
     mStateLock.unlock();
@@ -693,8 +694,8 @@ status_t SecCameraHardware::setParameters(const CameraParameters& params)
     strSize = params.get(CameraParameters::KEY_PREVIEW_SIZE);
     strPixfmt = params.get(CameraParameters::KEY_PREVIEW_FORMAT);
     if (!mPreviewRunning
-            ||_isParamUpdated(params, CameraParameters::KEY_PREVIEW_SIZE, strSize)
-            ||_isParamUpdated(params, CameraParameters::KEY_PREVIEW_FORMAT, strPixfmt)) {
+            || _isParamUpdated(params, CameraParameters::KEY_PREVIEW_SIZE, strSize)
+            || _isParamUpdated(params, CameraParameters::KEY_PREVIEW_FORMAT, strPixfmt)) {
         LOGV("setting preview format to %dx%d(%s)...", width, height, strPixfmt);
         params.getPreviewSize(&width, &height);
         err = mSecCamera->setPreviewFormat(width, height, strPixfmt);
@@ -703,7 +704,7 @@ status_t SecCameraHardware::setParameters(const CameraParameters& params)
             if (mOverlay != NULL
                     && mOverlay->setCrop(0, 0, width, height) != NO_ERROR) {
                 LOGE("ERR(%s)::(mOverlay->setCrop(0, 0, %d, %d) fail",
-                        __func__, width, height);
+                     __func__, width, height);
                 return UNKNOWN_ERROR;
             }
 #endif
@@ -716,8 +717,8 @@ status_t SecCameraHardware::setParameters(const CameraParameters& params)
     strSize = params.get(CameraParameters::KEY_PICTURE_SIZE);
     strPixfmt = params.get(CameraParameters::KEY_PICTURE_FORMAT);
     if (!mPreviewRunning
-            ||_isParamUpdated(params, CameraParameters::KEY_PICTURE_SIZE, strSize)
-            ||_isParamUpdated(params, CameraParameters::KEY_PICTURE_FORMAT, strPixfmt)) {
+            || _isParamUpdated(params, CameraParameters::KEY_PICTURE_SIZE, strSize)
+            || _isParamUpdated(params, CameraParameters::KEY_PICTURE_FORMAT, strPixfmt)) {
         LOGV("setting picture format to %dx%d(%s)...", width, height, strPixfmt);
         params.getPictureSize(&width, &height);
         err = mSecCamera->setSnapshotFormat(width, height, strPixfmt);
@@ -742,7 +743,7 @@ status_t SecCameraHardware::setParameters(const CameraParameters& params)
             || _isParamUpdated(params, CameraParameters::KEY_JPEG_THUMBNAIL_HEIGHT, height)) {
         LOGV("setting thumbnail size to %dx%d", width, height);
         err = mSecCamera->setJpegThumbnailSize(width, height);
-        if(!err) {
+        if (!err) {
             mParameters.set(CameraParameters::KEY_JPEG_THUMBNAIL_WIDTH, width);
             mParameters.set(CameraParameters::KEY_JPEG_THUMBNAIL_HEIGHT, height);
         }
@@ -784,7 +785,7 @@ status_t SecCameraHardware::setParameters(const CameraParameters& params)
 
     // scene-mode
     strKey = CameraParameters::KEY_SCENE_MODE;
-    const char* strSceneMode = params.get(strKey);
+    const char *strSceneMode = params.get(strKey);
     if (_isParamUpdated(params, strKey, strSceneMode)) {
         LOGV("setting scene-mode to %s...", strSceneMode);
         err = mSecCamera->setSceneMode(strSceneMode);
@@ -794,7 +795,7 @@ status_t SecCameraHardware::setParameters(const CameraParameters& params)
 
     // whitebalance
     strKey = CameraParameters::KEY_WHITE_BALANCE;
-    const char* strWhiteBalance = params.get(strKey);
+    const char *strWhiteBalance = params.get(strKey);
     if (_isParamUpdated(params, strKey, strWhiteBalance)) {
         LOGV("setting whitebalance to %s...", strWhiteBalance);
         err = mSecCamera->setWhiteBalance(strWhiteBalance);
@@ -804,7 +805,7 @@ status_t SecCameraHardware::setParameters(const CameraParameters& params)
 
     // effect
     strKey = CameraParameters::KEY_EFFECT;
-    const char* strEffect = params.get(strKey);
+    const char *strEffect = params.get(strKey);
     if (_isParamUpdated(params, strKey, strEffect)) {
         LOGV("setting effect to %s...", strEffect);
         err = mSecCamera->setEffect(strEffect);
@@ -824,7 +825,7 @@ status_t SecCameraHardware::setParameters(const CameraParameters& params)
 
     // frame rate
     int new_frame_rate = params.getPreviewFrameRate();
-    if(new_frame_rate < 5 || new_frame_rate > 30)
+    if (new_frame_rate < 5 || new_frame_rate > 30)
         new_frame_rate = 30;
 
     mParameters.setPreviewFrameRate(new_frame_rate);
@@ -850,7 +851,7 @@ CameraParameters SecCameraHardware::getParameters() const
 }
 
 status_t SecCameraHardware::sendCommand(int32_t command, int32_t arg1,
-                                         int32_t arg2)
+                                        int32_t arg2)
 {
     return BAD_VALUE;
 }
@@ -918,7 +919,7 @@ void SecCameraHardware::release()
     /* close after all the heaps are cleared since those
      * could have dup'd our file descriptor.
      */
-    if(mSecCamera != NULL) {
+    if (mSecCamera != NULL) {
         delete mSecCamera;
         //mSecCamera->Destroy();
         mSecCamera = NULL;
@@ -934,12 +935,12 @@ status_t SecCameraHardware::dump(int fd, const Vector<String16>& args) const
 
 // ---------------------------------------------------------------------------
 
-int SecCameraHardware::m_getGpsInfo(CameraParameters * camParams, gps_info * gps)
+int SecCameraHardware::m_getGpsInfo(CameraParameters *camParams, gps_info *gps)
 {
     int flag_gps_info_valid = 1;
     int each_info_valid = 1;
 
-    if(camParams == NULL || gps == NULL)
+    if (camParams == NULL || gps == NULL)
         return -1;
 
 #define PARSE_LOCATION(what,type,fmt,desc)                              \
@@ -962,7 +963,7 @@ int SecCameraHardware::m_getGpsInfo(CameraParameters * camParams, gps_info * gps
     PARSE_LOCATION(latitude,  double, "%lf", "double float");
     PARSE_LOCATION(longitude, double, "%lf", "double float");
 
-    if(each_info_valid == 0)
+    if (each_info_valid == 0)
         flag_gps_info_valid = 0;
 
     PARSE_LOCATION(timestamp, long, "%ld", "long");
@@ -973,7 +974,7 @@ int SecCameraHardware::m_getGpsInfo(CameraParameters * camParams, gps_info * gps
 
 #undef PARSE_LOCATION
 
-    if(flag_gps_info_valid == 1)
+    if (flag_gps_info_valid == 1)
         return 0;
     else
         return -1;
