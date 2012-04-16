@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-//#define LOG_NDEBUG 0
+#define LOG_NDEBUG 0
 #define LOG_TAG "SecV4L2Adapter"
 #include <utils/Log.h>
 
@@ -27,8 +27,7 @@
 
 #include "SecV4L2Adapter.h"
 
-namespace android
-{
+namespace android {
 
 #ifdef DEBUG_STR_PIXFMT
 const char SecV4L2Adapter::_strPixfmt_yuv420[]   = "YUV420";
@@ -41,7 +40,7 @@ const char SecV4L2Adapter::_strPixfmt_rgb565[]   = "RGB565";
 const char SecV4L2Adapter::_strPixfmt_unknown[]  = "UNKNOWN";
 #endif
 
-int SecV4L2Adapter::nPixfmt(const char *strPixfmt)
+int SecV4L2Adapter::nPixfmt(const char* strPixfmt)
 {
     int v4l2Pixfmt;
 
@@ -54,12 +53,12 @@ int SecV4L2Adapter::nPixfmt(const char *strPixfmt)
         v4l2Pixfmt = V4L2_PIX_FMT_RGB565;
     else if (0 == strcmp(strPixfmt, CameraParameters::PIXEL_FORMAT_YUV420SP))
         v4l2Pixfmt = V4L2_PIX_FMT_NV21;
+    else if (0 == strcmp(strPixfmt, CameraParameters::PIXEL_FORMAT_YUV420P))	// YV12
+        v4l2Pixfmt = V4L2_PIX_FMT_YUV420;
     else if (0 == strcmp(strPixfmt, "yuv420sp_custom"))
         v4l2Pixfmt = V4L2_PIX_FMT_NV12T;
     else if (0 == strcmp(strPixfmt, "yuv420sp_ycrcb"))
         v4l2Pixfmt = V4L2_PIX_FMT_NV21;
-    else if (0 == strcmp(strPixfmt, "yuv420p"))
-        v4l2Pixfmt = V4L2_PIX_FMT_YUV420;
     else if (0 == strcmp(strPixfmt, "yuv422i"))
         v4l2Pixfmt = V4L2_PIX_FMT_YUYV;
     else if (0 == strcmp(strPixfmt, "yuv422p"))
@@ -74,7 +73,7 @@ int SecV4L2Adapter::nPixfmt(const char *strPixfmt)
     return v4l2Pixfmt;
 }
 
-int SecV4L2Adapter::enumSceneMode(const char *strScene)
+int SecV4L2Adapter::enumSceneMode(const char* strScene)
 {
     int enumScene;
 
@@ -122,7 +121,7 @@ int SecV4L2Adapter::enumSceneMode(const char *strScene)
     return enumScene;
 }
 
-int SecV4L2Adapter::enumFlashMode(const char *strFlash)
+int SecV4L2Adapter::enumFlashMode(const char* strFlash)
 {
     int enumFlash;
 
@@ -161,7 +160,7 @@ int SecV4L2Adapter::enumBrightness(int ev)
     return ev_enum;
 }
 
-int SecV4L2Adapter::enumWB(const char *strWB)
+int SecV4L2Adapter::enumWB(const char* strWB)
 {
     int enumWB;
 
@@ -172,8 +171,10 @@ int SecV4L2Adapter::enumWB(const char *strWB)
 
     if (0 == strcmp(strWB, CameraParameters::WHITE_BALANCE_AUTO))
         enumWB = WHITE_BALANCE_AUTO;
+#if 0
     else if (0 == strcmp(strWB, CameraParameters::WHITE_BALANCE_INCANDESCENT))
         enumWB = WHITE_BALANCE_INCANDESCENT;
+#endif
     else if (0 == strcmp(strWB, CameraParameters::WHITE_BALANCE_FLUORESCENT))
         enumWB = WHITE_BALANCE_FLUORESCENT;
     else if (0 == strcmp(strWB, CameraParameters::WHITE_BALANCE_WARM_FLUORESCENT))
@@ -195,7 +196,7 @@ int SecV4L2Adapter::enumWB(const char *strWB)
     return enumWB;
 }
 
-int SecV4L2Adapter::enumEffect(const char *strEffect)
+int SecV4L2Adapter::enumEffect(const char* strEffect)
 {
     int enumEffect;
 
@@ -214,8 +215,10 @@ int SecV4L2Adapter::enumEffect(const char *strEffect)
         enumEffect = IMAGE_EFFECT_SEPIA;
     else if (0 == strcmp(strEffect, CameraParameters::EFFECT_AQUA))
         enumEffect = IMAGE_EFFECT_AQUA;
+#if 0
     else if (0 == strcmp(strEffect, CameraParameters::EFFECT_SOLARIZE))
         enumEffect = IMAGE_EFFECT_SOLARIZE;
+#endif
     else if (0 == strcmp(strEffect, CameraParameters::EFFECT_POSTERIZE))
         enumEffect = -1;
     else if (0 == strcmp(strEffect, CameraParameters::EFFECT_WHITEBOARD))
@@ -231,7 +234,7 @@ int SecV4L2Adapter::enumEffect(const char *strEffect)
     return enumEffect;
 }
 
-int SecV4L2Adapter::enumFocusMode(const char *strFocus)
+int SecV4L2Adapter::enumFocusMode(const char* strFocus)
 {
     int enumFocus;
 
@@ -302,9 +305,9 @@ unsigned int SecV4L2Adapter::frameSize(int width, int height, int v4l2Pixfmt)
 }
 
 #ifdef DEBUG_STR_PIXFMT
-const char *SecV4L2Adapter::_strPixfmt(int v4l2Pixfmt)
+const char* SecV4L2Adapter::_strPixfmt(int v4l2Pixfmt)
 {
-    const char *strPixfmt;
+    const char* strPixfmt;
     switch (v4l2Pixfmt) {
     case V4L2_PIX_FMT_YUV420:
         strPixfmt = _strPixfmt_yuv420;
@@ -339,7 +342,7 @@ const char *SecV4L2Adapter::_strPixfmt(int v4l2Pixfmt)
 }
 #endif
 
-SecV4L2Adapter::SecV4L2Adapter(const char *path, int ch) :
+SecV4L2Adapter::SecV4L2Adapter(const char* path, int ch) :
     _fd(0),
     _index(-1)
 {
@@ -366,7 +369,7 @@ SecV4L2Adapter::~SecV4L2Adapter()
         close(_fd);
 }
 
-int SecV4L2Adapter::_openCamera(const char *path)
+int SecV4L2Adapter::_openCamera(const char* path)
 {
     if (_fd) {
         LOGW("fd(%d) already opened. close it first!", _fd);
@@ -511,7 +514,7 @@ int SecV4L2Adapter::reqBufs(enum v4l2_buf_type t, int n)
     return req.count;
 }
 
-int SecV4L2Adapter::queryBuf(struct v4l2Buffer *buf, enum v4l2_buf_type type)
+int SecV4L2Adapter::queryBuf(struct v4l2Buffer* buf, enum v4l2_buf_type type)
 {
     struct v4l2_buffer v4l2_buf;
     int i, ret;
@@ -533,9 +536,9 @@ int SecV4L2Adapter::queryBuf(struct v4l2Buffer *buf, enum v4l2_buf_type type)
 
     buf->length = v4l2_buf.length;
 
-    if ((buf->start = (char *)mmap(0, v4l2_buf.length,
-                                   PROT_READ | PROT_WRITE, MAP_SHARED,
-                                   _fd, v4l2_buf.m.offset)) < 0) {
+    if ((buf->start = (char*)mmap(0, v4l2_buf.length,
+                                  PROT_READ | PROT_WRITE, MAP_SHARED,
+                                  _fd, v4l2_buf.m.offset)) < 0) {
         LOGE("%s %d] mmap() failed\n", __func__, __LINE__);
         return -1;
     }
@@ -546,7 +549,7 @@ int SecV4L2Adapter::queryBuf(struct v4l2Buffer *buf, enum v4l2_buf_type type)
     return 0;
 }
 
-int SecV4L2Adapter::queryBufs(struct v4l2Buffer *bufs, enum v4l2_buf_type type, int n)
+int SecV4L2Adapter::queryBufs(struct v4l2Buffer* bufs, enum v4l2_buf_type type, int n)
 {
     struct v4l2_buffer v4l2_buf;
     int i, ret;
@@ -571,9 +574,9 @@ int SecV4L2Adapter::queryBufs(struct v4l2Buffer *bufs, enum v4l2_buf_type type, 
 
         if (n == 1) {
             bufs[i].length = v4l2_buf.length;
-            if ((bufs[i].start = (char *)mmap(0, v4l2_buf.length,
-                                              PROT_READ | PROT_WRITE, MAP_SHARED,
-                                              _fd, v4l2_buf.m.offset)) < 0) {
+            if ((bufs[i].start = (char*)mmap(0, v4l2_buf.length,
+                                             PROT_READ | PROT_WRITE, MAP_SHARED,
+                                             _fd, v4l2_buf.m.offset)) < 0) {
                 LOGE("%s %d] mmap() failed\n", __func__, __LINE__);
                 return -1;
             }
@@ -598,7 +601,7 @@ int SecV4L2Adapter::startStream(bool on)
 
     ret = ioctl(_fd, on ? VIDIOC_STREAMON : VIDIOC_STREAMOFF, &type);
     if (ret < 0) {
-        LOGE("ERR(%s): Faile %s stream", __func__, on ? "on" : "off");
+        LOGE("ERR(%s): Failed stream %s", __func__, on ? "on" : "off");
         return ret;
     }
 
@@ -731,7 +734,7 @@ int SecV4L2Adapter::setCtrl(int id, int value)
     return ctrl.value;
 }
 
-int SecV4L2Adapter::getParm(struct sec_cam_parm *parm)
+int SecV4L2Adapter::getParm(struct sec_cam_parm* parm)
 {
     struct v4l2_streamparm streamparm;
     int ret;
@@ -759,7 +762,7 @@ int SecV4L2Adapter::getParm(struct sec_cam_parm *parm)
     return 0;
 }
 
-int SecV4L2Adapter::setParm(const struct sec_cam_parm *parm)
+int SecV4L2Adapter::setParm(const struct sec_cam_parm* parm)
 {
     struct v4l2_streamparm streamparm;
     int ret;
@@ -787,7 +790,7 @@ int SecV4L2Adapter::setParm(const struct sec_cam_parm *parm)
     return 0;
 }
 
-int SecV4L2Adapter::getAddr(int idx, unsigned int *addrY, unsigned int *addrC)
+int SecV4L2Adapter::getAddr(int idx, unsigned int* addrY, unsigned int* addrC)
 {
     if (addrY) {
         *addrY = setCtrl(V4L2_CID_PADDR_Y, idx);
@@ -820,7 +823,7 @@ int SecV4L2Adapter::waitFrame(void)
     return ret;
 }
 
-int SecV4L2Adapter::initBuf(struct v4l2Buffer *buf, int w, int h, int fmt)
+int SecV4L2Adapter::initBuf(struct v4l2Buffer* buf, int w, int h, int fmt)
 {
     buf->start = NULL;
     buf->length = frameSize(w, h, fmt);
@@ -828,13 +831,13 @@ int SecV4L2Adapter::initBuf(struct v4l2Buffer *buf, int w, int h, int fmt)
     return 0;
 }
 
-int SecV4L2Adapter::initBufs(struct v4l2Buffer *bufs, int w, int h, int fmt)
+int SecV4L2Adapter::initBufs(struct v4l2Buffer* bufs, int w, int h, int fmt)
 {
     int i, len;
 
     len = frameSize(w, h, fmt);
 
-    for (i = 0; i < MAX_BUFFERS; i++) {
+    for (i = 0; i < MAX_CAM_BUFFERS; i++) {
         bufs[i].start = NULL;
         bufs[i].length = len;
     }
@@ -842,7 +845,7 @@ int SecV4L2Adapter::initBufs(struct v4l2Buffer *bufs, int w, int h, int fmt)
     return 0;
 }
 
-int SecV4L2Adapter::closeBuf(struct v4l2Buffer *buf)
+int SecV4L2Adapter::closeBuf(struct v4l2Buffer* buf)
 {
     if (buf->start) {
         munmap(buf->start, buf->length);
@@ -854,11 +857,11 @@ int SecV4L2Adapter::closeBuf(struct v4l2Buffer *buf)
     return 0;
 }
 
-int SecV4L2Adapter::closeBufs(struct v4l2Buffer *bufs)
+int SecV4L2Adapter::closeBufs(struct v4l2Buffer* bufs)
 {
     int i;
 
-    for (i = 0; i < MAX_BUFFERS; i++) {
+    for (i = 0; i < MAX_CAM_BUFFERS; i++) {
         if (bufs[i].start) {
             munmap(bufs[i].start, bufs[i].length);
             LOGV("munmap():virt. addr[%d]: 0x%x size = %d\n",
@@ -869,9 +872,15 @@ int SecV4L2Adapter::closeBufs(struct v4l2Buffer *bufs)
 
     return 0;
 }
+
 int SecV4L2Adapter::getFd(void)
 {
     return _fd;
+}
+
+int SecV4L2Adapter::getChIdx(void)
+{
+    return _index;
 }
 
 };

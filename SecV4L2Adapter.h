@@ -23,52 +23,51 @@
 
 #undef DEBUG_STR_PIXFMT
 
-namespace android
-{
+namespace android {
 
-#define MAX_BUFFERS	(8)
+#define MAX_CAM_BUFFERS	(8)
 
 struct v4l2Buffer {
-    void   *start;
+    void*   start;
     size_t  length;
 };
 
-class SecV4L2Adapter
-{
+class SecV4L2Adapter {
 public:
-    SecV4L2Adapter(const char *path, int ch);
+    SecV4L2Adapter(const char* path, int ch);
     ~SecV4L2Adapter();
 
     int getFd(void);
+    int getChIdx(void);
 
     int setFmt(int w, int h, unsigned int fmt, int flag);
     int reqBufs(enum v4l2_buf_type t, int n);
-    int queryBuf(struct v4l2Buffer *bufs, enum v4l2_buf_type type);
-    int queryBufs(struct v4l2Buffer *bufs, enum v4l2_buf_type type, int n);
-    int initBuf(struct v4l2Buffer *buf, int w, int h, int fmt);
-    int initBufs(struct v4l2Buffer *bufs, int w, int h, int fmt);
-    int closeBuf(struct v4l2Buffer *buf);
-    int closeBufs(struct v4l2Buffer *bufs);
+    int queryBuf(struct v4l2Buffer* bufs, enum v4l2_buf_type type);
+    int queryBufs(struct v4l2Buffer* bufs, enum v4l2_buf_type type, int n);
+    int initBuf(struct v4l2Buffer* buf, int w, int h, int fmt);
+    int initBufs(struct v4l2Buffer* bufs, int w, int h, int fmt);
+    int closeBuf(struct v4l2Buffer* buf);
+    int closeBufs(struct v4l2Buffer* bufs);
     int startStream(bool on);
     int qbuf(int idx);
     int dqbuf(void);
     int blk_dqbuf(void);
     int getCtrl(int id);
     int setCtrl(int id, int value);
-    int getParm(struct sec_cam_parm *parm);
-    int setParm(const struct sec_cam_parm *parm);
+    int getParm(struct sec_cam_parm* parm);
+    int setParm(const struct sec_cam_parm* parm);
     int waitFrame(void);
 
-    int getAddr(int idx, unsigned int *addrY, unsigned int *addrC);
+    int getAddr(int idx, unsigned int* addrY, unsigned int* addrC);
 
-    int enumSceneMode(const char *strScene);
-    int enumFlashMode(const char *strFlash);
+    int enumSceneMode(const char* strScene);
+    int enumFlashMode(const char* strFlash);
     int enumBrightness(int ev);
-    int enumWB(const char *strWB);
-    int enumEffect(const char *strEffect);
-    int enumFocusMode(const char *strFocus);
+    int enumWB(const char* strWB);
+    int enumEffect(const char* strEffect);
+    int enumFocusMode(const char* strFocus);
 
-    int nPixfmt(const char *strPixfmt);
+    int nPixfmt(const char* strPixfmt);
 
     unsigned int frameSize(int v4l2_pixfmt, int width, int height);
 
@@ -77,11 +76,11 @@ private:
     int _index;
     struct pollfd _poll;
 
-    int _openCamera(const char *path);
+    int _openCamera(const char* path);
     int _setInputChann(int ch);
 
 #ifdef DEBUG_STR_PIXFMT
-    const char *_strPixfmt(int v4l2Pixfmt);
+    const char* _strPixfmt(int v4l2Pixfmt);
 
     static const char _strPixfmt_yuv420[];
     static const char _strPixfmt_nv12[];

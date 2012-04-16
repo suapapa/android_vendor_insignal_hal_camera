@@ -17,16 +17,14 @@
 #ifndef __ANDROID_HARDWARE_LIBCAMERA_JPEG_INTERFACE_H__
 #define __ANDROID_HARDWARE_LIBCAMERA_JPEG_INTERFACE_H__
 
-namespace android
-{
+namespace android {
 
-class JpegInterface
-{
+class JpegInterface {
 public:
     virtual ~JpegInterface() { }
     virtual int setImgFormat(int w, int h, int f) = 0;
-    virtual int doCompress(unsigned char *inBuff, int inBuffSize) = 0;
-    virtual int copyOutput(unsigned char *outBuff, int outBuffSize) = 0;
+    virtual int doCompress(uint8_t* inBuff, int inBuffSize) = 0;
+    virtual int copyOutput(uint8_t* outBuff, int outBuffSize) = 0;
 
     virtual int setQuality(int q) = 0;
     virtual int setThumbSize(int w, int h) = 0;

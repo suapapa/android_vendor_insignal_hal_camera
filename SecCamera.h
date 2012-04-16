@@ -23,8 +23,7 @@
 #include "SecV4L2Adapter.h"
 #include "JpegInterface.h"
 
-namespace android
-{
+namespace android {
 
 #define DUAL_PORT_RECORDING //Define this if 2 fimc ports are needed for recording.
 
@@ -60,10 +59,9 @@ namespace android
 #endif
 
 
-class SecCamera
-{
+class SecCamera {
 public:
-    SecCamera(const char *camPath, const char *recPath, int ch);
+    SecCamera(const char* camPath, const char* recPath, int ch);
     ~SecCamera();
 
     int                 flagCreate(void) const;
@@ -74,28 +72,29 @@ public:
 #ifdef DUAL_PORT_RECORDING
     int                 startRecord(void);
     int                 stopRecord(void);
-    int                 getRecordBuffer(int *index, unsigned int *addrY, unsigned int *addrC);
+    int                 getRecordBuffer(int* index, unsigned int* addrY, unsigned int* addrC);
     void                releaseRecordFrame(int i);
 #endif
 
-    int                 getPreviewBuffer(int *index, unsigned int *addrY, unsigned int *addrC);
+    int                 getPreviewBuffer(int* index, unsigned int* addrY, unsigned int* addrC);
 
-    int                 setPreviewFormat(int width, int height, const char *strPixfmt);
+    int                 setPreviewFormat(int width, int height, const char* strPixfmt);
     unsigned int        getPreviewFrameSize(void);
+    void                getPreviewFrameSize(int* width, int* height, int* frameSize);
 
-    int                 setSnapshotFormat(int width, int height, const char *strPixfmt);
+    int                 setSnapshotFormat(int width, int height, const char* strPixfmt);
     unsigned int        getSnapshotFrameSize(void);
 
     int                 startAutoFocus(void);
     int                 abortAutoFocus(void);
     bool                getAutoFocusResult(void);
 
-    int                 setSceneMode(const char *strScenemode);
-    int                 setWhiteBalance(const char *strWhitebalance);
-    int                 setEffect(const char *strEffect);
-    int                 setFlashMode(const char *strFlashMode);
+    int                 setSceneMode(const char* strScenemode);
+    int                 setWhiteBalance(const char* strWhitebalance);
+    int                 setEffect(const char* strEffect);
+    int                 setFlashMode(const char* strFlashMode);
     int                 setBrightness(int brightness);
-    int                 setFocusMode(const char *strFocusMode);
+    int                 setFocusMode(const char* strFocusMode);
 
     int                 setRotate(int angle);
     void                setFrameRate(int frame_rate);
@@ -104,8 +103,8 @@ public:
 
     int                 startSnapshot(void);
     int                 getSnapshot(int xth = 0);
-    int                 getRawSnapshot(unsigned char *buffer, unsigned int size);
-    int                 getJpegSnapshot(unsigned char *buffer, unsigned int size);
+    int                 getRawSnapshot(uint8_t* buffer, unsigned int size);
+    int                 getJpegSnapshot(uint8_t* buffer, unsigned int size);
     int                 endSnapshot(void);
 
     int                 setJpegThumbnailSize(int width, int height);
@@ -133,25 +132,25 @@ private:
 
     bool                _isPreviewOn;
 
-    struct v4l2Buffer   _previewBufs[MAX_BUFFERS];
+    struct v4l2Buffer   _previewBufs[MAX_CAM_BUFFERS];
     struct v4l2Buffer   _captureBuf;
 
 #ifdef DUAL_PORT_RECORDING
     bool                _isRecordOn;
-    struct v4l2Buffer   _recordBufs[MAX_BUFFERS];
+    struct v4l2Buffer   _recordBufs[MAX_CAM_BUFFERS];
 #endif
 
-    SecV4L2Adapter     *_v4l2Cam;
-    SecV4L2Adapter     *_v4l2Rec;
+    SecV4L2Adapter*     _v4l2Cam;
+    SecV4L2Adapter*     _v4l2Rec;
 
-    JpegInterface      *_jpeg;
+    JpegInterface*      _jpeg;
 
     void                _release(void);
     void                _initParms(void);
-    int                 _getPhyAddr(int index, unsigned int *addrY, unsigned int *addrC);
+    int                 _getPhyAddr(int index, unsigned int* addrY, unsigned int* addrC);
 };
 
-extern unsigned long measure_time(struct timeval *start, struct timeval *stop);
+extern unsigned long measure_time(struct timeval* start, struct timeval* stop);
 
 }; // namespace android
 

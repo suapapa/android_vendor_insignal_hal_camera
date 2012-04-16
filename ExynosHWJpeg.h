@@ -20,18 +20,16 @@
 #include "jpeg_api.h"
 #include "JpegInterface.h"
 
-namespace android
-{
+namespace android {
 
-class ExynosHWJpeg : public JpegInterface
-{
+class ExynosHWJpeg : public JpegInterface {
 public:
     ExynosHWJpeg();
     ~ExynosHWJpeg();
 
     virtual int setImgFormat(int w, int h, int f);
-    virtual int doCompress(unsigned char *inBuff, int inBuffSize);
-    virtual int copyOutput(unsigned char *outBuff, int outBuffSize);
+    virtual int doCompress(uint8_t* inBuff, int inBuffSize);
+    virtual int copyOutput(uint8_t* outBuff, int outBuffSize);
 
     virtual int setQuality(int q);
     virtual int setThumbSize(int w, int h);
@@ -44,7 +42,7 @@ private:
     int _fd;
 
     int _outSize;
-    unsigned char *_outBuff;
+    uint8_t* _outBuff;
 
     struct jpeg_enc_param _params;
 

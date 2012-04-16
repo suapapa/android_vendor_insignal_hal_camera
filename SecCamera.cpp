@@ -30,15 +30,19 @@ using namespace android;
                 __func__, __LINE__, #T);        \
     }
 
-namespace android
-{
+#define CHECK_EQ(A, B)                          \
+    if (!(A == B)) {                            \
+        LOGE("%s+%d: Expected %s(%d) == %s(%d)!!", \
+                __func__, __LINE__, #A, A, #B, B);     \
+    }
+namespace android {
 
 // ======================================================================
 // Camera controls
 static struct timeval time_start;
 static struct timeval time_stop;
 
-unsigned long measure_time(struct timeval *start, struct timeval *stop)
+unsigned long measure_time(struct timeval* start, struct timeval* stop)
 {
     unsigned long sec, usec, time;
 
@@ -70,7 +74,7 @@ void SecCamera::releaseRecordFrame(int i)
 // ======================================================================
 // Constructor & Destructor
 
-SecCamera::SecCamera(const char *camPath, const char *recPath, int ch) :
+SecCamera::SecCamera(const char* camPath, const char* recPath, int ch) :
     _isInited(false),
     _previewWidth(0),
     _previewHeight(0),
@@ -170,32 +174,32 @@ int SecCamera::startPreview(void)
     CHECK(ret == 0);
 
     _v4l2Cam->initBufs(_previewBufs, _previewWidth, _previewHeight, _previewPixfmt);
-    ret = _v4l2Cam->reqBufs(V4L2_BUF_TYPE_VIDEO_CAPTURE, MAX_BUFFERS);
-    CHECK(ret == MAX_BUFFERS);
+    ret = _v4l2Cam->reqBufs(V4L2_BUF_TYPE_VIDEO_CAPTURE, MAX_CAM_BUFFERS);
+    CHECK(ret == MAX_CAM_BUFFERS);
 
-    ret = _v4l2Cam->queryBufs(_previewBufs, V4L2_BUF_TYPE_VIDEO_CAPTURE, MAX_BUFFERS);
+    ret = _v4l2Cam->queryBufs(_previewBufs, V4L2_BUF_TYPE_VIDEO_CAPTURE, MAX_CAM_BUFFERS);
     CHECK(ret == 0);
 
     /* start with all buffers in queue */
-    for (int i = 0; i < MAX_BUFFERS; i++) {
+    for (int i = 0; i < MAX_CAM_BUFFERS; i++) {
         ret = _v4l2Cam->qbuf(i);
         CHECK(ret == 0);
     }
 
     ret = _v4l2Cam->startStream(true);
-    CHECK(ret == 0);
+    CHECK_EQ(ret, 0);
 
     _isPreviewOn = true;
 
     ret = _v4l2Cam->setParm(&_parms);
-    CHECK(ret == 0);
+    CHECK_EQ(ret, 0);
 
     ret = _v4l2Cam->waitFrame();
-    CHECK(ret > 0);
+    CHECK_EQ(ret, 0);
 
     int index = _v4l2Cam->dqbuf();
     ret = _v4l2Cam->qbuf(index);
-    CHECK(ret == 0);
+    CHECK_EQ(ret, 0);
 
     return 0;
 }
@@ -236,14 +240,14 @@ int SecCamera::startRecord(void)
     CHECK(ret == 0);
 
     _v4l2Rec->initBufs(_recordBufs, _previewWidth, _previewHeight, _previewPixfmt);
-    ret = _v4l2Rec->reqBufs(V4L2_BUF_TYPE_VIDEO_CAPTURE, MAX_BUFFERS);
+    ret = _v4l2Rec->reqBufs(V4L2_BUF_TYPE_VIDEO_CAPTURE, MAX_CAM_BUFFERS);
     CHECK(ret == 0);
 
-    ret = _v4l2Rec->queryBufs(_recordBufs, V4L2_BUF_TYPE_VIDEO_CAPTURE, MAX_BUFFERS);
+    ret = _v4l2Rec->queryBufs(_recordBufs, V4L2_BUF_TYPE_VIDEO_CAPTURE, MAX_CAM_BUFFERS);
     CHECK(ret == 0);
 
     /* start with all buffers in queue */
-    for (int i = 0; i < MAX_BUFFERS; i++) {
+    for (int i = 0; i < MAX_CAM_BUFFERS; i++) {
         ret = _v4l2Rec->qbuf(i);
         CHECK(ret == 0);
     }
@@ -283,7 +287,7 @@ int SecCamera::stopRecord(void)
     return 0;
 }
 
-int SecCamera::getRecordBuffer(int *index, unsigned int *addrY, unsigned int *addrC)
+int SecCamera::getRecordBuffer(int* index, unsigned int* addrY, unsigned int* addrC)
 {
 #ifdef PERFORMANCE
     LOG_TIME_START(0);
@@ -299,7 +303,7 @@ int SecCamera::getRecordBuffer(int *index, unsigned int *addrY, unsigned int *ad
     _v4l2Rec->waitFrame();
     *index = _v4l2Rec->dqbuf();
 #endif
-    if (!(0 <= *index && *index < MAX_BUFFERS)) {
+    if (!(0 <= *index && *index < MAX_CAM_BUFFERS)) {
         LOGE("ERR(%s):wrong index = %d\n", __func__, *index);
         return -1;
     }
@@ -310,7 +314,7 @@ int SecCamera::getRecordBuffer(int *index, unsigned int *addrY, unsigned int *ad
 }
 #endif //DUAL_PORT_RECORDING
 
-int SecCamera::_getPhyAddr(int index, unsigned int *addrY, unsigned int *addrC)
+int SecCamera::_getPhyAddr(int index, unsigned int* addrY, unsigned int* addrC)
 {
     int ret = _v4l2Cam->qbuf(index);
     CHECK(ret == 0);
@@ -320,7 +324,7 @@ int SecCamera::_getPhyAddr(int index, unsigned int *addrY, unsigned int *addrC)
     return 0;
 }
 
-int SecCamera::getPreviewBuffer(int *index, unsigned int *addrY, unsigned int *addrC)
+int SecCamera::getPreviewBuffer(int* index, unsigned int* addrY, unsigned int* addrC)
 {
 #ifdef PERFORMANCE
     LOG_TIME_START(0);
@@ -335,7 +339,7 @@ int SecCamera::getPreviewBuffer(int *index, unsigned int *addrY, unsigned int *a
 #else
     *index = _v4l2Cam->blk_dqbuf();
 #endif
-    if (!(0 <= *index && *index < MAX_BUFFERS)) {
+    if (!(0 <= *index && *index < MAX_CAM_BUFFERS)) {
         LOGE("ERR(%s):wrong index = %d\n", __func__, *index);
         return -1;
     }
@@ -348,7 +352,7 @@ void SecCamera::pausePreview()
     _v4l2Cam->setCtrl(V4L2_CID_STREAM_PAUSE, 0);
 }
 
-int SecCamera::setPreviewFormat(int width, int height, const char *strPixfmt)
+int SecCamera::setPreviewFormat(int width, int height, const char* strPixfmt)
 {
     _previewWidth = width;
     _previewHeight = height;
@@ -365,6 +369,16 @@ int SecCamera::setPreviewFormat(int width, int height, const char *strPixfmt)
 unsigned int SecCamera::getPreviewFrameSize(void)
 {
     return _previewFrameSize;
+}
+
+void SecCamera::getPreviewFrameSize(int* width, int* height, int* frameSize)
+{
+    if (width)
+        *width = _previewWidth;
+    if (height)
+        *height = _previewHeight;
+    if (frameSize)
+        *frameSize = _previewFrameSize;
 }
 
 // ======================================================================
@@ -427,7 +441,7 @@ int SecCamera::getSnapshot(int xth)
     return 0;
 }
 
-int SecCamera::getRawSnapshot(unsigned char *buffer, unsigned int size)
+int SecCamera::getRawSnapshot(uint8_t* buffer, unsigned int size)
 {
     if (buffer == NULL) {
         LOGE("%s: got null pointer!", __func__);
@@ -446,7 +460,7 @@ int SecCamera::getRawSnapshot(unsigned char *buffer, unsigned int size)
     return 0;
 }
 
-int SecCamera::setSnapshotFormat(int width, int height, const char *strPixfmt)
+int SecCamera::setSnapshotFormat(int width, int height, const char* strPixfmt)
 {
     _snapshotWidth  = width;
     _snapshotHeight = height;
@@ -536,7 +550,7 @@ int SecCamera::setRotate(int angle)
     return 0;
 }
 
-int SecCamera::setSceneMode(const char *strSceneMode)
+int SecCamera::setSceneMode(const char* strSceneMode)
 {
     _parms.scene_mode = _v4l2Cam->enumSceneMode(strSceneMode);
 
@@ -552,7 +566,7 @@ int SecCamera::setSceneMode(const char *strSceneMode)
     return 0 > ret ? -1 : 0;
 }
 
-int SecCamera::setWhiteBalance(const char *strWhiteBalance)
+int SecCamera::setWhiteBalance(const char* strWhiteBalance)
 {
     _parms.white_balance = _v4l2Cam->enumWB(strWhiteBalance);
 
@@ -568,7 +582,7 @@ int SecCamera::setWhiteBalance(const char *strWhiteBalance)
     return 0 > ret ? -1 : 0;
 }
 
-int SecCamera::setEffect(const char *strEffect)
+int SecCamera::setEffect(const char* strEffect)
 {
     _parms.effects = _v4l2Cam->enumEffect(strEffect);
 
@@ -584,7 +598,7 @@ int SecCamera::setEffect(const char *strEffect)
     return 0 > ret ? -1 : 0;
 }
 
-int SecCamera::setFlashMode(const char *strFlashMode)
+int SecCamera::setFlashMode(const char* strFlashMode)
 {
     _parms.flash_mode = _v4l2Cam->enumFlashMode(strFlashMode);
 
@@ -631,7 +645,7 @@ int SecCamera::setBrightness(int brightness)
     return 0 > ret ? -1 : 0;
 }
 
-int SecCamera::setFocusMode(const char *strFocusMode)
+int SecCamera::setFocusMode(const char* strFocusMode)
 {
     _parms.focus_mode = _v4l2Cam->enumFocusMode(strFocusMode);
 
@@ -664,16 +678,18 @@ void SecCamera::_initParms(void)
     _parms.saturation           = SATURATION_DEFAULT;
     _parms.scene_mode           = SCENE_MODE_NONE;
     _parms.sharpness            = SHARPNESS_DEFAULT;
+#if 0
     _parms.fps                  = FRAME_RATE_AUTO;
+#endif
     _parms.capture.timeperframe.numerator = 1;
     _parms.capture.timeperframe.denominator = 30;
 }
 
 // ======================================================================
 // Jpeg
-int SecCamera::getJpegSnapshot(unsigned char *buffer, unsigned int size)
+int SecCamera::getJpegSnapshot(uint8_t* buffer, unsigned int size)
 {
-    _jpeg->doCompress((unsigned char *)_captureBuf.start,
+    _jpeg->doCompress((uint8_t*)_captureBuf.start,
                       _captureBuf.length);
 
     return _jpeg->copyOutput(buffer, size);

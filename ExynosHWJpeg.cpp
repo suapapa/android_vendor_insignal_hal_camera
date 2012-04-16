@@ -23,8 +23,7 @@
 
 #include "ExynosHWJpeg.h"
 
-namespace android
-{
+namespace android {
 
 ExynosHWJpeg::ExynosHWJpeg() :
     _fd(0),
@@ -68,7 +67,7 @@ int ExynosHWJpeg::setImgFormat(int w, int h, int f)
     return 0;
 }
 
-int ExynosHWJpeg::doCompress(unsigned char *inBuff, int inBuffSize)
+int ExynosHWJpeg::doCompress(uint8_t* inBuff, int inBuffSize)
 {
     //_reset();
 
@@ -78,7 +77,7 @@ int ExynosHWJpeg::doCompress(unsigned char *inBuff, int inBuffSize)
     }
 
     // Get input buffer
-    unsigned char *buff = (unsigned char *)api_jpeg_get_encode_in_buf(_fd, inBuffSize);
+    uint8_t* buff = (uint8_t*)api_jpeg_get_encode_in_buf(_fd, inBuffSize);
     if (buff == NULL) {
         LOGE("%s: Failed to get input buffer!", __func__);
         return -1;
@@ -86,7 +85,7 @@ int ExynosHWJpeg::doCompress(unsigned char *inBuff, int inBuffSize)
     memcpy(buff, inBuff, inBuffSize);
 
     // Get output buffer
-    _outBuff = (unsigned char *)api_jpeg_get_encode_out_buf(_fd);
+    _outBuff = (uint8_t*)api_jpeg_get_encode_out_buf(_fd);
     if (_outBuff == NULL) {
         LOGE("%s: Failed to get input buffer!", __func__);
         return -1;
@@ -107,7 +106,7 @@ int ExynosHWJpeg::doCompress(unsigned char *inBuff, int inBuffSize)
     return _params.size;
 }
 
-int ExynosHWJpeg::copyOutput(unsigned char *outBuff, int outBuffSize)
+int ExynosHWJpeg::copyOutput(uint8_t* outBuff, int outBuffSize)
 {
     int jpegSize = _params.size;
 

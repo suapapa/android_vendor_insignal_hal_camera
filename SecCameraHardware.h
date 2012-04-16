@@ -19,189 +19,152 @@
 #define __ANDROID_HARDWARE_LIBCAMERA_SEC_CAMERA_HARDWARE_H__
 
 #include "SecCamera.h"
-#include <utils/threads.h>
-#include <camera/CameraHardwareInterface.h>
-#include <binder/MemoryBase.h>
-#include <binder/MemoryHeapBase.h>
+#include <hardware/camera.h>
+#include <camera/CameraParameters.h>
 #include <utils/threads.h>
 
-namespace android
-{
+namespace android {
 
-class SecCameraHardware : public CameraHardwareInterface
-{
+class SecCameraHardware {
 
 public:
-    virtual sp<IMemoryHeap> getPreviewHeap() const;
-    virtual sp<IMemoryHeap> getRawHeap() const;
+    void        setCallbacks(camera_notify_callback notify_cb,
+                             camera_data_callback data_cb,
+                             camera_data_timestamp_callback data_cb_timestamp,
+                             camera_request_memory req_memory,
+                             void* user);
 
-    virtual void        setCallbacks(notify_callback notify_cb,
-                                     data_callback data_cb,
-                                     data_callback_timestamp data_cb_timestamp,
-                                     void *user);
+    void        enableMsgType(int32_t msgType);
+    void        disableMsgType(int32_t msgType);
+    bool        msgTypeEnabled(int32_t msgType);
 
-    virtual void        enableMsgType(int32_t msgType);
-    virtual void        disableMsgType(int32_t msgType);
-    virtual bool        msgTypeEnabled(int32_t msgType);
+    status_t    setPreviewWindow(preview_stream_ops* window);
+    status_t    storeMetaDataInBuffers(bool enable);
 
-#if defined(BOARD_USES_CAMERA_OVERLAY)
-    virtual bool        useOverlay();
-    virtual status_t    setOverlay(const sp<Overlay> &overlay);
-#endif
+    status_t    startPreview();
+    void        stopPreview();
+    bool        previewEnabled();
 
-    virtual status_t    startPreview();
-    virtual void        stopPreview();
-    virtual bool        previewEnabled();
+    status_t    startRecording();
+    void        stopRecording();
+    bool        recordingEnabled();
+    void        releaseRecordingFrame(const void* opaque);
 
-    virtual status_t    startRecording();
-    virtual void        stopRecording();
-    virtual bool        recordingEnabled();
-    virtual void        releaseRecordingFrame(const sp<IMemory>& mem);
+    status_t    autoFocus();
+    status_t    cancelAutoFocus();
 
-    virtual status_t    autoFocus();
-    virtual status_t    cancelAutoFocus();
+    status_t    takePicture();
+    status_t    cancelPicture();
 
-    virtual status_t    takePicture();
-    virtual status_t    cancelPicture();
+    status_t    setParameters(const CameraParameters& parms);
+    CameraParameters  getParameters() const;
+    status_t    sendCommand(int32_t command, int32_t arg1, int32_t arg2);
+    int         getCameraId(void) const;
 
-    virtual status_t    setParameters(const CameraParameters &params);
-    virtual CameraParameters  getParameters() const;
-    virtual status_t    sendCommand(int32_t command,
-                                    int32_t arg1, int32_t arg2);
+    void        release();
+    status_t    dump(int fd) const;
 
-    virtual void        release();
-    virtual status_t    dump(int fd, const Vector<String16>& args) const;
-
-    static sp<CameraHardwareInterface> createInstance(int cameraId);
-
-private:
     SecCameraHardware(int cameraId);
     virtual    ~SecCameraHardware();
+private:
 
-    class PreviewThread : public Thread
-    {
-        SecCameraHardware *mHardware;
-    public:
-        PreviewThread(SecCameraHardware *hw):
-            Thread(false),
-            mHardware(hw) { }
-        virtual void onFirstRef() {
-            run("CameraPreviewThread", PRIORITY_URGENT_DISPLAY);
-        }
-        virtual bool threadLoop() {
-            mHardware->previewThreadWrapper();
-            return false;
-        }
+#define DEFINE_THREAD(N, P, L)                                  \
+    bool L();                                                   \
+    class N : public Thread {                                   \
+        SecCameraHardware* _hw;                                 \
+    public:                                                     \
+        N(SecCameraHardware* hw):Thread(false), _hw(hw) { }     \
+        virtual bool threadLoop() { return _hw->L(); }          \
+        status_t startLoop() { return run("Camera"#N, P); }     \
+    }
+
+    DEFINE_THREAD(PreviewThread, PRIORITY_URGENT_DISPLAY, _previewLoop);
+    DEFINE_THREAD(AutoFocusThread, PRIORITY_DEFAULT, _autofocusLoop);
+    DEFINE_THREAD(PictureThread, PRIORITY_DEFAULT, _pictureLoop);
+
+#undef DEFINE_THREAD
+
+
+//------------------------------------------
+    enum previewState {
+        PREVIEW_IDLE = 0,
+        PREVIEW_PENDING,
+        PREVIEW_RUNNING,
+        PREVIEW_RECORDING,
+        PREVIEW_ABORT,
+        PREVIEW_INVALID
     };
+    enum previewState   _previewState;
+    mutable Mutex       _previewLock;
 
-    class PictureThread : public Thread
-    {
-        SecCameraHardware *mHardware;
-    public:
-        PictureThread(SecCameraHardware *hw):
-            Thread(false),
-            mHardware(hw) { }
-        virtual bool threadLoop() {
-            mHardware->pictureThread();
-            return false;
-        }
-    };
-
-    class AutoFocusThread : public Thread
-    {
-        SecCameraHardware *mHardware;
-    public:
-        AutoFocusThread(SecCameraHardware *hw):
-            Thread(false),
-            mHardware(hw) { }
-        virtual void onFirstRef() {
-            run("CameraAutoFocusThread", PRIORITY_DEFAULT);
-        }
-        virtual bool threadLoop() {
-            mHardware->autoFocusThread();
-            return true;
-        }
-    };
-
-    typedef struct {
-        double       latitude;   // degrees, WGS ellipsoid
-        double       longitude;  // degrees
-        unsigned int timestamp;  // seconds since 1/6/1980
-        int          altitude;   // meters
-    } gps_info;
-
-    static wp<CameraHardwareInterface> singleton;
-
-    /* used to guard threading state */
-    mutable Mutex       mStateLock;
-
-    CameraParameters    mParameters;
-
-    static const int    kBufferCount = MAX_BUFFERS;
-    static const int    kBufferCountForRecord = MAX_BUFFERS;
-
-    sp<MemoryHeapBase>  mPreviewHeap;
-    sp<MemoryHeapBase>  mRawHeap;
-    sp<MemoryHeapBase>  mRecordHeap;
-    sp<MemoryBase>      mBuffers      [kBufferCount];
-
-    unsigned int        mPreviewFrameSize;
-
-    SecCamera          *mSecCamera;
-    bool                mPreviewRunning;
-    bool                mExitPreviewThread;
-
-    bool                mRecordRunning;
-    mutable Mutex       mRecordLock;
-
-    bool		mCaptureInProgress;
-
-    unsigned int        mPreviewFrameRateMicrosec;
-    DurationTimer       mFrameRateTimer;
-
-#if defined(BOARD_USES_CAMERA_OVERLAY)
-    sp<Overlay>         mOverlay;
-    int                 mOverlayBufferIdx;
-#endif
-
-    notify_callback     mNotifyCb;
-    data_callback       mDataCb;
-    data_callback_timestamp mDataCbTimestamp;
-    void               *mCallbackCookie;
-
-    int32_t             mMsgEnabled;
-
-    int                 mAFMode;
-
-    gps_info            mGpsInfo;
-
-    void       _initParams(int cameraId);
-    bool       _isParamUpdated(const CameraParameters &newParams,
-                               const char *key, const char *newValue) const;
-    bool       _isParamUpdated(const CameraParameters &newParams,
-                               const char *key, int newValue) const;
-
-    sp<PreviewThread>   mPreviewThread;
-    int                 previewThread();
-    int                 previewThreadWrapper();
+    sp<PreviewThread>   _previewThread;
 
     /* used by preview thread to block until it's told to run */
-    mutable Mutex       mPreviewLock;
-    mutable Condition   mPreviewCondition;
+    mutable Condition   _previewConditionStateChanged;
     mutable Condition   mPreviewStoppedCondition;
 
-    sp<AutoFocusThread> mAutoFocusThread;
-    int                 autoFocusThread();
+    status_t            _startPreviewLocked(void);
+    void                _stopPreviewLocked(void);
+//------------------------------------------
+    enum focusState {
+        FOCUS_IDLE = 0,
+        FOCUS_RUN_AF,
+        FOCUS_RUN_CAF,
+        FOCUS_INVALID
+    };
+    enum focusState     _focusState;
+    mutable Mutex       _focusLock;
+
+    sp<AutoFocusThread> _autofocusThread;
 
     /* used by auto focus thread to block until it's told to run */
     mutable Mutex       mFocusLock;
     mutable Condition   mFocusCondition;
     bool                mExitAutoFocusThread;
 
-    sp<PictureThread>   mPictureThread;
-    int                 pictureThread();
+//------------------------------------------
+    enum pictureState {
+        PICTURE_IDLE = 0,
+        PICTURE_CAPTURING,
+        PICTURE_COMPRESSING,
+        PICTURE_INVALID
+    };
+    enum pictureState   _pictureState;
+    mutable Mutex       _pictureLock;
+    mutable Condition   mCaptureCondition;
 
-    int        m_getGpsInfo(CameraParameters *camParams, gps_info *gps);
+    sp<PictureThread>   _pictureThread;
+
+    status_t 		_waitPictureComplete(void);
+//------------------------------------------
+
+    int                 _cameraId;
+
+    CameraParameters    _parms;
+
+    camera_memory_t*    _previewHeap;
+    camera_memory_t*    _rawHeap;
+    camera_memory_t*    _recordHeap;
+
+    SecCamera*          _camera;
+
+    preview_stream_ops* _window;
+
+    camera_notify_callback              _cbNotify;
+    camera_data_callback                _cbData;
+    camera_data_timestamp_callback      _cbDataWithTS;
+    camera_request_memory               _cbReqMemory;
+    void*                               _cbCookie;
+
+    int32_t             _msgs;
+
+    void        _initParams(void);
+    bool        _isParamUpdated(const CameraParameters& newParams,
+                                const char* key, const char* newValue) const;
+    bool        _isParamUpdated(const CameraParameters& newParams,
+                                const char* key, int newValue) const;
+
+    int		_fillWindow(char* previewFrame, int width, int height);
 };
 
 }; // namespace android
