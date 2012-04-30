@@ -10,7 +10,7 @@ LOCAL_SRC_FILES += \
 	CameraInfo.cpp
 
 LOCAL_SRC_FILES += \
-	SecCameraHardware.cpp \
+	CameraHardware.cpp \
 	SecCamera.cpp \
 	SecV4L2Adapter.cpp \
 

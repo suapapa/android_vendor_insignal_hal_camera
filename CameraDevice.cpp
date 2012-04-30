@@ -19,7 +19,7 @@
 #define LOG_TAG "CameraDevice"
 #include <utils/Log.h>
 
-#include "SecCameraHardware.h"
+#include "CameraHardware.h"
 #include "CameraDevice.h"
 
 namespace android {
@@ -29,7 +29,7 @@ namespace android {
 
 static camera_device_t* g_dev = NULL;
 #define CALL_HW(F, ...) \
-    ((reinterpret_cast<SecCameraHardware *>(g_dev->priv))->F(__VA_ARGS__))
+    ((reinterpret_cast<CameraHardware *>(g_dev->priv))->F(__VA_ARGS__))
 
 
 static int cam_dev_set_preview_window(struct camera_device* dev,
@@ -267,7 +267,7 @@ static int cam_dev_close(struct hw_device_t* device)
     }
 
     if (g_dev->priv)
-        delete static_cast<SecCameraHardware *>(g_dev->priv);
+        delete static_cast<CameraHardware *>(g_dev->priv);
 
     delete g_dev;
     g_dev = NULL;
@@ -294,7 +294,7 @@ camera_device_t* cam_dev_get_instance(int id)
     g_dev->common.close = cam_dev_close;
 
     g_dev->ops = &g_dev_ops;
-    g_dev->priv = new SecCameraHardware(id);
+    g_dev->priv = new CameraHardware(id);
     if (g_dev->priv == NULL) {
         LOGE("%s: Fail to alloc mem for CameraHardware!", __func__);
         cam_dev_close((hw_device_t*)g_dev);

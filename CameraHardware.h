@@ -15,8 +15,8 @@
 ** limitations under the License.
 */
 
-#ifndef __ANDROID_HARDWARE_LIBCAMERA_SEC_CAMERA_HARDWARE_H__
-#define __ANDROID_HARDWARE_LIBCAMERA_SEC_CAMERA_HARDWARE_H__
+#ifndef __ANDROID_HARDWARE_LIBCAMERA_CAMERA_HARDWARE_H__
+#define __ANDROID_HARDWARE_LIBCAMERA_CAMERA_HARDWARE_H__
 
 #include "SecCamera.h"
 #include <hardware/camera.h>
@@ -25,7 +25,7 @@
 
 namespace android {
 
-class SecCameraHardware {
+class CameraHardware {
 
 public:
     void        setCallbacks(camera_notify_callback notify_cb,
@@ -64,16 +64,16 @@ public:
     void        release();
     status_t    dump(int fd) const;
 
-    SecCameraHardware(int cameraId);
-    virtual    ~SecCameraHardware();
+    CameraHardware(int cameraId);
+    virtual    ~CameraHardware();
 private:
 
 #define DEFINE_THREAD(N, P, L)                                  \
     bool L();                                                   \
     class N : public Thread {                                   \
-        SecCameraHardware* _hw;                                 \
+        CameraHardware* _hw;                                    \
     public:                                                     \
-        N(SecCameraHardware* hw):Thread(false), _hw(hw) { }     \
+        N(CameraHardware* hw):Thread(false), _hw(hw) { }        \
         virtual bool threadLoop() { return _hw->L(); }          \
         status_t startLoop() { return run("Camera"#N, P); }     \
     }
@@ -135,7 +135,7 @@ private:
 
     sp<PictureThread>   _pictureThread;
 
-    status_t 		_waitPictureComplete(void);
+    status_t            _waitPictureComplete(void);
 //------------------------------------------
 
     int                 _cameraId;
@@ -164,7 +164,7 @@ private:
     bool        _isParamUpdated(const CameraParameters& newParams,
                                 const char* key, int newValue) const;
 
-    int		_fillWindow(char* previewFrame, int width, int height);
+    int         _fillWindow(char* previewFrame, int width, int height);
 };
 
 }; // namespace android

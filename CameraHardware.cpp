@@ -17,7 +17,7 @@
  */
 
 //#define LOG_NDEBUG 0
-#define LOG_TAG "SecCameraHardware"
+#define LOG_TAG "CameraHardware"
 #include <utils/Log.h>
 
 #include <libyuv.h>
@@ -26,7 +26,7 @@
 #include <media/stagefright/MetadataBufferType.h>
 
 #include "CameraInfo.h"
-#include "SecCameraHardware.h"
+#include "CameraHardware.h"
 
 namespace android {
 
@@ -47,7 +47,7 @@ struct ADDRS {
         }                                                       \
     }
 
-SecCameraHardware::SecCameraHardware(int cameraId)
+CameraHardware::CameraHardware(int cameraId)
     : _cameraId(-1),
       _parms(),
       _previewHeap(NULL),
@@ -94,27 +94,27 @@ SecCameraHardware::SecCameraHardware(int cameraId)
     _pictureState = PICTURE_IDLE;
     _pictureThread = new PictureThread(this);
 
-    LOGI("SecCameraHardware inited");
+    LOGI("CameraHardware inited");
 }
 
-int SecCameraHardware::getCameraId(void) const
+int CameraHardware::getCameraId(void) const
 {
     return _cameraId;
 }
 
-void SecCameraHardware::_initParams(void)
+void CameraHardware::_initParams(void)
 {
     String8 strCamParam(camera_info_get_default_camera_param_str(_cameraId));
     _parms.unflatten(strCamParam);
 }
 
-SecCameraHardware::~SecCameraHardware()
+CameraHardware::~CameraHardware()
 {
     release();
-    LOGI("SecCameraHardware destroyed");
+    LOGI("CameraHardware destroyed");
 }
 
-status_t SecCameraHardware::setPreviewWindow(preview_stream_ops* window)
+status_t CameraHardware::setPreviewWindow(preview_stream_ops* window)
 {
     Mutex::Autolock lock(_previewLock);
 
@@ -160,7 +160,7 @@ status_t SecCameraHardware::setPreviewWindow(preview_stream_ops* window)
     return OK;
 }
 
-status_t SecCameraHardware::storeMetaDataInBuffers(bool enable)
+status_t CameraHardware::storeMetaDataInBuffers(bool enable)
 {
     // FIXME:
     // metadata buffer mode can be turned on or off.
@@ -172,7 +172,7 @@ status_t SecCameraHardware::storeMetaDataInBuffers(bool enable)
     return OK;
 }
 
-void SecCameraHardware::setCallbacks(camera_notify_callback notify_cb,
+void CameraHardware::setCallbacks(camera_notify_callback notify_cb,
                                      camera_data_callback data_cb,
                                      camera_data_timestamp_callback data_cb_timestamp,
                                      camera_request_memory req_memory,
@@ -185,24 +185,24 @@ void SecCameraHardware::setCallbacks(camera_notify_callback notify_cb,
     _cbCookie           = user;
 }
 
-void SecCameraHardware::enableMsgType(int32_t msgType)
+void CameraHardware::enableMsgType(int32_t msgType)
 {
     _msgs |= msgType;
 }
 
-void SecCameraHardware::disableMsgType(int32_t msgType)
+void CameraHardware::disableMsgType(int32_t msgType)
 {
     _msgs &= ~msgType;
 }
 
-bool SecCameraHardware::msgTypeEnabled(int32_t msgType)
+bool CameraHardware::msgTypeEnabled(int32_t msgType)
 {
     return (_msgs & msgType);
 }
 
 // ---------------------------------------------------------------------------
 
-int SecCameraHardware::_fillWindow(char* previewFrame, int width, int height)
+int CameraHardware::_fillWindow(char* previewFrame, int width, int height)
 {
     if (_window == NULL) {
         LOGE("%s: No window!", __func__);
@@ -263,7 +263,7 @@ int SecCameraHardware::_fillWindow(char* previewFrame, int width, int height)
     return NO_ERROR;
 }
 
-bool SecCameraHardware::_previewLoop()
+bool CameraHardware::_previewLoop()
 {
     // while (1) {
     _previewLock.lock();
@@ -353,7 +353,7 @@ bool SecCameraHardware::_previewLoop()
 }
 
 
-status_t SecCameraHardware::_startPreviewLocked()
+status_t CameraHardware::_startPreviewLocked()
 {
     LOGV("%s", __func__);
 
@@ -386,7 +386,7 @@ status_t SecCameraHardware::_startPreviewLocked()
     return NO_ERROR;
 }
 
-status_t SecCameraHardware::startPreview()
+status_t CameraHardware::startPreview()
 {
     if (_waitPictureComplete() != NO_ERROR) {
         LOGE("%s: Too long wait for capture finish!", __func__);
@@ -411,7 +411,7 @@ status_t SecCameraHardware::startPreview()
     return _startPreviewLocked();
 }
 
-void SecCameraHardware::_stopPreviewLocked()
+void CameraHardware::_stopPreviewLocked()
 {
     if (_previewState != PREVIEW_RUNNING) {
         LOGV("%s: Expected preview is running but, _previewState = %d",
@@ -426,14 +426,14 @@ void SecCameraHardware::_stopPreviewLocked()
     mPreviewStoppedCondition.wait(_previewLock);
 }
 
-void SecCameraHardware::stopPreview()
+void CameraHardware::stopPreview()
 {
     Mutex::Autolock lock(_previewLock);
 
     _stopPreviewLocked();
 }
 
-bool SecCameraHardware::previewEnabled()
+bool CameraHardware::previewEnabled()
 {
     Mutex::Autolock lock(_previewLock);
 
@@ -442,7 +442,7 @@ bool SecCameraHardware::previewEnabled()
 
 // ---------------------------------------------------------------------------
 
-status_t SecCameraHardware::startRecording()
+status_t CameraHardware::startRecording()
 {
     LOGV("%s :", __func__);
 
@@ -472,7 +472,7 @@ status_t SecCameraHardware::startRecording()
     return NO_ERROR;
 }
 
-void SecCameraHardware::stopRecording()
+void CameraHardware::stopRecording()
 {
     LOGV("%s :", __func__);
 
@@ -491,7 +491,7 @@ void SecCameraHardware::stopRecording()
     _previewState = PREVIEW_RUNNING;
 }
 
-bool SecCameraHardware::recordingEnabled()
+bool CameraHardware::recordingEnabled()
 {
     LOGV("%s :", __func__);
 
@@ -500,13 +500,13 @@ bool SecCameraHardware::recordingEnabled()
     return (_previewState == PREVIEW_RECORDING);
 }
 
-void SecCameraHardware::releaseRecordingFrame(const void* opaque)
+void CameraHardware::releaseRecordingFrame(const void* opaque)
 {
     struct ADDRS* addrs = (struct ADDRS*)opaque;
     _camera->releaseRecordFrame(addrs->buf_idx);
 }
 
-bool SecCameraHardware::_autofocusLoop()
+bool CameraHardware::_autofocusLoop()
 {
     LOGV("%s : starting", __func__);
 
@@ -552,7 +552,7 @@ bool SecCameraHardware::_autofocusLoop()
     return true;
 }
 
-status_t SecCameraHardware::autoFocus()
+status_t CameraHardware::autoFocus()
 {
     LOGV("%s :", __func__);
     /* signal autoFocusThread to run once */
@@ -561,7 +561,7 @@ status_t SecCameraHardware::autoFocus()
     return NO_ERROR;
 }
 
-status_t SecCameraHardware::cancelAutoFocus()
+status_t CameraHardware::cancelAutoFocus()
 {
     LOGV("%s :", __func__);
 
@@ -576,7 +576,7 @@ status_t SecCameraHardware::cancelAutoFocus()
     return NO_ERROR;
 }
 
-bool SecCameraHardware::_pictureLoop()
+bool CameraHardware::_pictureLoop()
 {
     int ret = NO_ERROR;
 
@@ -658,7 +658,7 @@ out:
     return false;
 }
 
-status_t SecCameraHardware::_waitPictureComplete()
+status_t CameraHardware::_waitPictureComplete()
 {
     Mutex::Autolock lock(_pictureLock);
 
@@ -676,7 +676,7 @@ status_t SecCameraHardware::_waitPictureComplete()
     return NO_ERROR;
 }
 
-status_t SecCameraHardware::takePicture()
+status_t CameraHardware::takePicture()
 {
     stopPreview();
 
@@ -693,12 +693,12 @@ status_t SecCameraHardware::takePicture()
     return NO_ERROR;
 }
 
-status_t SecCameraHardware::cancelPicture()
+status_t CameraHardware::cancelPicture()
 {
     return NO_ERROR;
 }
 
-bool SecCameraHardware::_isParamUpdated(const CameraParameters& newParams,
+bool CameraHardware::_isParamUpdated(const CameraParameters& newParams,
                                         const char* key, const char* newValue) const
 {
     if (NULL == newValue) {
@@ -720,7 +720,7 @@ bool SecCameraHardware::_isParamUpdated(const CameraParameters& newParams,
     return false;
 }
 
-bool SecCameraHardware::_isParamUpdated(const CameraParameters& newParams,
+bool CameraHardware::_isParamUpdated(const CameraParameters& newParams,
                                         const char* key, int newValue) const
 {
     if (NULL == _parms.get(key)) {
@@ -738,7 +738,7 @@ bool SecCameraHardware::_isParamUpdated(const CameraParameters& newParams,
     return false;
 }
 
-status_t SecCameraHardware::setParameters(const CameraParameters& parms)
+status_t CameraHardware::setParameters(const CameraParameters& parms)
 {
     status_t ret = NO_ERROR;
     const char* strKey;
@@ -901,19 +901,19 @@ status_t SecCameraHardware::setParameters(const CameraParameters& parms)
     return err ? UNKNOWN_ERROR : NO_ERROR;
 }
 
-CameraParameters SecCameraHardware::getParameters() const
+CameraParameters CameraHardware::getParameters() const
 {
     LOGV("%s :", __func__);
     return _parms;
 }
 
-status_t SecCameraHardware::sendCommand(int32_t command, int32_t arg1,
+status_t CameraHardware::sendCommand(int32_t command, int32_t arg1,
                                         int32_t arg2)
 {
     return BAD_VALUE;
 }
 
-void SecCameraHardware::release()
+void CameraHardware::release()
 {
     LOGV("%s :", __func__);
 
@@ -979,7 +979,7 @@ void SecCameraHardware::release()
     }
 }
 
-status_t SecCameraHardware::dump(int fd) const
+status_t CameraHardware::dump(int fd) const
 {
     // TODO: fill dump!
 
@@ -988,7 +988,7 @@ status_t SecCameraHardware::dump(int fd) const
 
 // ---------------------------------------------------------------------------
 #if 0
-int SecCameraHardware::m_getGpsInfo(CameraParameters* camParams, gps_info* gps)
+int CameraHardware::m_getGpsInfo(CameraParameters* camParams, gps_info* gps)
 {
     int flag_gps_info_valid = 1;
     int each_info_valid = 1;
