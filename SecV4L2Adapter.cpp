@@ -820,7 +820,7 @@ int SecV4L2Adapter::waitFrame(void)
         return ret;
     }
 
-    return ret;
+    return 0;
 }
 
 int SecV4L2Adapter::initBuf(struct v4l2Buffer* buf, int w, int h, int fmt)

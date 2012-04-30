@@ -19,7 +19,7 @@
 
 #include <sys/poll.h>
 #include <linux/videodev2.h>
-#include <videodev2_samsung.h>
+#include "videodev2_samsung.h"
 
 #undef DEBUG_STR_PIXFMT
 

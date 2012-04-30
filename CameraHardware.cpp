@@ -49,18 +49,18 @@ struct ADDRS {
 
 CameraHardware::CameraHardware(int cameraId)
     : _cameraId(-1),
-      _parms(),
+      _camera(NULL),
+      _msgs(0),
       _previewHeap(NULL),
       _rawHeap(NULL),
       _recordHeap(NULL),
-      _camera(NULL),
-      _window(NULL),
       _cbNotify(NULL),
       _cbData(NULL),
       _cbDataWithTS(NULL),
       _cbReqMemory(NULL),
       _cbCookie(NULL),
-      _msgs(0)
+      _parms(),
+      _window(NULL)
 {
     LOGV("%s :", __func__);
 
@@ -78,18 +78,13 @@ CameraHardware::CameraHardware(int cameraId)
     _cameraId = cameraId;
     _initParams();
 
-    mExitAutoFocusThread = false;
-    /* whether the PreviewThread is active in preview or stopped.  we
-     * create the thread but it is initially in stopped state.
-     */
     _previewState = PREVIEW_IDLE;
-    //_previewThread = new PreviewThread(this);
     _previewThread = new PreviewThread(this);
     _previewThread->startLoop();
 
     _focusState = FOCUS_IDLE;
-    _autofocusThread = new AutoFocusThread(this);
-    _autofocusThread->startLoop();
+    _focusThread = new FocusThread(this);
+    _focusThread->startLoop();
 
     _pictureState = PICTURE_IDLE;
     _pictureThread = new PictureThread(this);
@@ -142,7 +137,6 @@ status_t CameraHardware::setPreviewWindow(preview_stream_ops* window)
     _parms.getPreviewSize(&w, &h);
     CALL_WIN(set_usage, GRALLOC_USAGE_SW_WRITE_OFTEN);
     CALL_WIN(set_buffers_geometry, w, h, HAL_PIXEL_FORMAT_YV12); // 3 plannar
-    //CALL_WIN(set_buffers_geometry, w, h, HAL_PIXEL_FORMAT_YCrCb_420_SP); // 2 plannar
 
     if (_previewState == PREVIEW_PENDING) {
         LOGI("Starting pended preview...");
@@ -275,19 +269,18 @@ bool CameraHardware::_previewLoop()
         }
 
         // signal that we're stopped
-        mPreviewStoppedCondition.signal();
-        _previewConditionStateChanged.wait(_previewLock);
-        LOGI("%s: return from wait", __func__);
+        _previewStoppedCondition.signal();
+        _previewStateChangedCondition.wait(_previewLock);
     }
     _previewLock.unlock();
 
+    LOGI("staring preview...");
     int index;
     int ret = _camera->getPreviewBuffer(&index, NULL, NULL);
     if (0 > ret) {
         LOGE("%s: Faile to get PhyAddr for Preview!", __func__);
         return false;
     }
-
     nsecs_t timestamp = systemTime(SYSTEM_TIME_MONOTONIC);
 
     int w, h, frameSize;
@@ -358,7 +351,7 @@ status_t CameraHardware::_startPreviewLocked()
     }
 
     _previewState = PREVIEW_RUNNING;
-    _previewConditionStateChanged.signal();
+    _previewStateChangedCondition.signal();
 
     return NO_ERROR;
 }
@@ -398,9 +391,9 @@ void CameraHardware::_stopPreviewLocked()
 
     // request that the preview thread stop.
     _previewState = PREVIEW_IDLE;
-    _previewConditionStateChanged.signal();
+    _previewStateChangedCondition.signal();
     // wait until preview thread is stopped.
-    mPreviewStoppedCondition.wait(_previewLock);
+    _previewStoppedCondition.wait(_previewLock);
 }
 
 void CameraHardware::stopPreview()
@@ -483,66 +476,72 @@ void CameraHardware::releaseRecordingFrame(const void* opaque)
     _camera->releaseRecordFrame(addrs->buf_idx);
 }
 
-bool CameraHardware::_autofocusLoop()
+bool CameraHardware::_focusLoop()
 {
-    LOGV("%s : starting", __func__);
+    Mutex::Autolock lock(_focusLock);
 
-    /* block until we're told to start.  we don't want to use
-     * a restartable thread and requestExitAndWait() in cancelAutoFocus()
-     * because it would cause deadlock between our callbacks and the
-     * caller of cancelAutoFocus() which both want to grab the same lock
-     * in CameraServices layer.
-     */
-    mFocusLock.lock();
-    /* check early exit request */
-    if (mExitAutoFocusThread) {
-        mFocusLock.unlock();
-        LOGV("%s : exiting on request0", __func__);
-        return false;
-    }
-    mFocusCondition.wait(mFocusLock);
-    /* check early exit request */
-    if (mExitAutoFocusThread) {
-        mFocusLock.unlock();
-        LOGV("%s : exiting on request1", __func__);
-        return false;
-    }
-    mFocusLock.unlock();
+    switch (_focusState) {
+    case FOCUS_IDLE:
+        _focusStateChangedCondition.wait(_focusLock);
+        LOGV("_focusState changed to %d", _focusState);
+        break;
 
-    if (0 == (_msgs & CAMERA_MSG_FOCUS)) {
-        LOGW("%s: AF not enabled by App!", __func__);
-        return NO_ERROR;
-    }
+    case FOCUS_RUN_AF:
+        if (_camera->startAutoFocus() < 0) {
+            LOGE("%s: Stop FocusThread!", __func__);
+            return false;
+        }
+        _focusState = FOCUS_GET_RESULT;
+        break;
 
-    LOGV("%s : calling setAutoFocus", __func__);
-    if (_camera->startAutoFocus() < 0) {
-        LOGE("Stop AutoFocusThread!");
+    case FOCUS_GET_RESULT:
+        if (_cbNotify && (_msgs & CAMERA_MSG_FOCUS)) {
+            bool afDone = _camera->getAutoFocusResult();
+            _cbNotify(CAMERA_MSG_FOCUS, afDone, 0, _cbCookie);
+        }
+        _focusState = FOCUS_IDLE;
+        break;
+
+    case FOCUS_ABORT:
+    default:
+        LOGI("aborting focusThread...");
         return false;
     }
 
-    //sched_yield();
-
-    bool afDone = _camera->getAutoFocusResult();
-    _cbNotify(CAMERA_MSG_FOCUS, afDone, 0, _cbCookie);
-
-    LOGV("%s : exiting with no error", __func__);
     return true;
 }
 
 status_t CameraHardware::autoFocus()
 {
-    LOGV("%s :", __func__);
+    if (_focusThread == NULL) {
+        LOGE("%s: No focusThread! ignore autoFocus!", __func__);
+        return NO_ERROR;
+    }
+
+    Mutex::Autolock lock(_focusLock);
+
+    if (_focusState != FOCUS_IDLE) {
+        LOGE("%s: Expected FOCUS_IDLE but state is %d", __func__, _focusState);
+        return UNKNOWN_ERROR;
+    }
+
     /* signal autoFocusThread to run once */
-    if (_autofocusThread != NULL)
-        mFocusCondition.signal();
+    _focusState = FOCUS_RUN_AF;
+    _focusStateChangedCondition.signal();
+
     return NO_ERROR;
 }
 
 status_t CameraHardware::cancelAutoFocus()
 {
-    LOGV("%s :", __func__);
+    Mutex::Autolock lock(_focusLock);
 
-//TODO: is it cancleable?
+    LOGI("%s: AF canceling... current state is %d",
+         __func__, _focusState);
+
+    _focusState = FOCUS_IDLE;
+
+    //TODO: is it cancleable?
 #if 0
     if (_camera->abortAutoFocus() < 0) {
         LOGE("ERR(%s):Fail on _camera->cancelAutofocus()", __func__);
@@ -561,7 +560,7 @@ bool CameraHardware::_pictureLoop()
 
     //_pictureLock.lock();
     _pictureState = PICTURE_CAPTURING;
-    mCaptureCondition.broadcast();
+    _pictureStateChangedCondition.broadcast();
     //_pictureLock.unlock();
 
     LOGV("doing snapshot...");
@@ -589,7 +588,7 @@ bool CameraHardware::_pictureLoop()
     }
 
     _pictureState = PICTURE_COMPRESSING;
-    mCaptureCondition.broadcast();
+    _pictureStateChangedCondition.broadcast();
 
     if (_cbData && (_msgs & CAMERA_MSG_COMPRESSED_IMAGE)) {
         // TODO: the heap size too enough for jpeg..
@@ -630,7 +629,7 @@ out:
     ret = _camera->endSnapshot();
 
     _pictureState = PICTURE_IDLE;
-    mCaptureCondition.broadcast();
+    _pictureStateChangedCondition.broadcast();
 
     return false;
 }
@@ -648,7 +647,7 @@ status_t CameraHardware::_waitPictureComplete()
             return TIMED_OUT;
         }
         LOGD("Waiting for picture thread to complete.");
-        mCaptureCondition.waitRelative(_pictureLock, remainingTime);
+        _pictureStateChangedCondition.waitRelative(_pictureLock, remainingTime);
     }
     return NO_ERROR;
 }
@@ -908,23 +907,23 @@ void CameraHardware::release()
         _previewLock.lock();
         _previewThread->requestExit();
         _previewState = PREVIEW_ABORT;
-        _previewConditionStateChanged.signal();
+        _previewStateChangedCondition.signal();
         _previewLock.unlock();
         _previewThread->requestExitAndWait();
         _previewThread.clear();
     }
 
-    if (_autofocusThread != NULL) {
+    if (_focusThread != NULL) {
         /* this thread is normally already in it's threadLoop but blocked
          * on the condition variable.  signal it so it wakes up and can exit.
          */
-        mFocusLock.lock();
-        _autofocusThread->requestExit();
-        mExitAutoFocusThread = true;
-        mFocusCondition.signal();
-        mFocusLock.unlock();
-        _autofocusThread->requestExitAndWait();
-        _autofocusThread.clear();
+        _focusLock.lock();
+        _focusThread->requestExit();
+        _focusState = FOCUS_ABORT;
+        _focusStateChangedCondition.signal();
+        _focusLock.unlock();
+        _focusThread->requestExitAndWait();
+        _focusThread.clear();
     }
 
     if (_pictureThread != NULL) {
@@ -962,53 +961,5 @@ status_t CameraHardware::dump(int fd) const
 
     return NO_ERROR;
 }
-
-// ---------------------------------------------------------------------------
-#if 0
-int CameraHardware::m_getGpsInfo(CameraParameters* camParams, gps_info* gps)
-{
-    int flag_gps_info_valid = 1;
-    int each_info_valid = 1;
-
-    if (camParams == NULL || gps == NULL)
-        return -1;
-
-#define PARSE_LOCATION(what,type,fmt,desc)                              \
-    do {                                                                \
-        const char *what##_str = camParams->get("gps-"#what);           \
-        if (what##_str) {                                               \
-            type what = 0;                                              \
-            if (sscanf(what##_str, fmt, &what) == 1)                    \
-                gps->what = what;                                       \
-            else {                                                      \
-                LOGE("GPS " #what " %s could not"                       \
-                        " be parsed as a " #desc,                       \
-                        what##_str);                                    \
-                each_info_valid = 0;                                    \
-            }                                                           \
-        } else                                                          \
-            each_info_valid = 0;                                        \
-    } while(0)
-
-    PARSE_LOCATION(latitude,  double, "%lf", "double float");
-    PARSE_LOCATION(longitude, double, "%lf", "double float");
-
-    if (each_info_valid == 0)
-        flag_gps_info_valid = 0;
-
-    PARSE_LOCATION(timestamp, long, "%ld", "long");
-    if (!gps->timestamp)
-        gps->timestamp = time(NULL);
-
-    PARSE_LOCATION(altitude, int, "%d", "int");
-
-#undef PARSE_LOCATION
-
-    if (flag_gps_info_valid == 1)
-        return 0;
-    else
-        return -1;
-}
-#endif
 
 }; // namespace android

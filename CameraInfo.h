@@ -1,6 +1,7 @@
 #ifndef __ANDROID_HARDWARE_LIBCAMERA_CAMERA_INFO_H__
 #define __ANDROID_HARDWARE_LIBCAMERA_CAMERA_INFO_H__
 
+#include <string.h>
 #include <hardware/camera.h>
 
 namespace android {

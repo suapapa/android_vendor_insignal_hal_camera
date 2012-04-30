@@ -514,6 +514,9 @@ int SecCamera::abortAutoFocus(void)
 bool SecCamera::getAutoFocusResult(void)
 {
     bool afDone = false;
+// TODO: get result of AF is 2 step,
+// V4L2_CID_CAMERA_AUTO_FOCUS_RESULT_FIRST and V4L2_CID_CAMERA_AUTO_FOCUS_RESULT_SECOND
+#if 0 
     int ret = _v4l2Cam->getCtrl(V4L2_CID_CAMERA_AUTO_FOCUS_RESULT);
     switch (ret) {
     case 0x01:
@@ -531,6 +534,7 @@ bool SecCamera::getAutoFocusResult(void)
     }
 
     LOGW_IF(!afDone, "%s: AF failed! ret = %d", __func__, ret);
+#endif
 
     return afDone;
 }
@@ -678,9 +682,7 @@ void SecCamera::_initParms(void)
     _parms.saturation           = SATURATION_DEFAULT;
     _parms.scene_mode           = SCENE_MODE_NONE;
     _parms.sharpness            = SHARPNESS_DEFAULT;
-#if 0
     _parms.fps                  = FRAME_RATE_AUTO;
-#endif
     _parms.capture.timeperframe.numerator = 1;
     _parms.capture.timeperframe.denominator = 30;
 }

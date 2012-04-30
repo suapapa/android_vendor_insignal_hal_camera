@@ -66,7 +66,36 @@ public:
 
     CameraHardware(int cameraId);
     virtual    ~CameraHardware();
+
 private:
+    int                 _cameraId;
+    SecCamera*          _camera;
+
+    int32_t             _msgs;
+    camera_memory_t*    _previewHeap;
+    camera_memory_t*    _rawHeap;
+    camera_memory_t*    _recordHeap;
+
+
+    camera_notify_callback              _cbNotify;
+    camera_data_callback                _cbData;
+    camera_data_timestamp_callback      _cbDataWithTS;
+    camera_request_memory               _cbReqMemory;
+    void*                               _cbCookie;
+
+    CameraParameters    _parms;
+    void                _initParams(void);
+    bool                _isParamUpdated(const CameraParameters& newParams,
+                                        const char* key,
+                                        const char* newValue) const;
+    bool                _isParamUpdated(const CameraParameters& newParams,
+                                        const char* key,
+                                        int newValue) const;
+
+    preview_stream_ops* _window;
+    status_t            _fillWindow(const char* previewFrame,
+                                    int width, int height,
+                                    const char* strPixfmt);
 
 #define DEFINE_THREAD(N, P, L)                                  \
     bool L();                                                   \
@@ -79,13 +108,7 @@ private:
     }
 
     DEFINE_THREAD(PreviewThread, PRIORITY_URGENT_DISPLAY, _previewLoop);
-    DEFINE_THREAD(AutoFocusThread, PRIORITY_DEFAULT, _autofocusLoop);
-    DEFINE_THREAD(PictureThread, PRIORITY_DEFAULT, _pictureLoop);
-
-#undef DEFINE_THREAD
-
-
-//------------------------------------------
+    sp<PreviewThread>   _previewThread;
     enum previewState {
         PREVIEW_IDLE = 0,
         PREVIEW_PENDING,
@@ -95,34 +118,29 @@ private:
         PREVIEW_INVALID
     };
     enum previewState   _previewState;
+    mutable Condition   _previewStateChangedCondition;
+    mutable Condition   _previewStoppedCondition;
     mutable Mutex       _previewLock;
-
-    sp<PreviewThread>   _previewThread;
-
-    /* used by preview thread to block until it's told to run */
-    mutable Condition   _previewConditionStateChanged;
-    mutable Condition   mPreviewStoppedCondition;
-
     status_t            _startPreviewLocked(void);
     void                _stopPreviewLocked(void);
-//------------------------------------------
+
+    DEFINE_THREAD(FocusThread, PRIORITY_DEFAULT, _focusLoop);
+    sp<FocusThread> _focusThread;
     enum focusState {
         FOCUS_IDLE = 0,
         FOCUS_RUN_AF,
         FOCUS_RUN_CAF,
+        FOCUS_GET_RESULT,
+        FOCUS_ABORT,
         FOCUS_INVALID
     };
     enum focusState     _focusState;
+    mutable Condition   _focusStateChangedCondition;
     mutable Mutex       _focusLock;
 
-    sp<AutoFocusThread> _autofocusThread;
 
-    /* used by auto focus thread to block until it's told to run */
-    mutable Mutex       mFocusLock;
-    mutable Condition   mFocusCondition;
-    bool                mExitAutoFocusThread;
-
-//------------------------------------------
+    DEFINE_THREAD(PictureThread, PRIORITY_DEFAULT, _pictureLoop);
+    sp<PictureThread>   _pictureThread;
     enum pictureState {
         PICTURE_IDLE = 0,
         PICTURE_CAPTURING,
@@ -130,43 +148,12 @@ private:
         PICTURE_INVALID
     };
     enum pictureState   _pictureState;
+    mutable Condition   _pictureStateChangedCondition;
     mutable Mutex       _pictureLock;
-    mutable Condition   mCaptureCondition;
-
-    sp<PictureThread>   _pictureThread;
-
     status_t            _waitPictureComplete(void);
-//------------------------------------------
 
-    int                 _cameraId;
+#undef DEFINE_THREAD
 
-    CameraParameters    _parms;
-
-    camera_memory_t*    _previewHeap;
-    camera_memory_t*    _rawHeap;
-    camera_memory_t*    _recordHeap;
-
-    SecCamera*          _camera;
-
-    preview_stream_ops* _window;
-
-    camera_notify_callback              _cbNotify;
-    camera_data_callback                _cbData;
-    camera_data_timestamp_callback      _cbDataWithTS;
-    camera_request_memory               _cbReqMemory;
-    void*                               _cbCookie;
-
-    int32_t             _msgs;
-
-    void        _initParams(void);
-    bool        _isParamUpdated(const CameraParameters& newParams,
-                                const char* key, const char* newValue) const;
-    bool        _isParamUpdated(const CameraParameters& newParams,
-                                const char* key, int newValue) const;
-
-    status_t    _fillWindow(const char* previewFrame,
-                            int width, int height,
-                            const char* strPixfmt);
 };
 
 }; // namespace android
