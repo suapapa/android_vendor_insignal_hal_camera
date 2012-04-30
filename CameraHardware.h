@@ -164,7 +164,9 @@ private:
     bool        _isParamUpdated(const CameraParameters& newParams,
                                 const char* key, int newValue) const;
 
-    int         _fillWindow(char* previewFrame, int width, int height);
+    status_t    _fillWindow(const char* previewFrame,
+                            int width, int height,
+                            const char* strPixfmt);
 };
 
 }; // namespace android

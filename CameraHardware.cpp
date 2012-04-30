@@ -43,7 +43,7 @@ struct ADDRS {
     if (_window) {                                              \
         if (_window->F(_window, __VA_ARGS__)) {                 \
             LOGE("%s: Failed while run %s", __func__, #F);      \
-            return UNKNOWN_ERROR;                           \
+            return UNKNOWN_ERROR;                               \
         }                                                       \
     }
 
@@ -140,15 +140,8 @@ status_t CameraHardware::setPreviewWindow(preview_stream_ops* window)
 
     int w, h;
     _parms.getPreviewSize(&w, &h);
-
     CALL_WIN(set_usage, GRALLOC_USAGE_SW_WRITE_OFTEN);
-
-    // TODO: pixel format hardcoded!!
-
-    // I/SecV4L2Adapter( 2088): passed fmt = 825382478 found pixel format[9]: YUV 4:2:0 planar, Y/CrCb
-    // FYI ./system/core/include/system/graphics.h
-    CALL_WIN(set_buffers_geometry, w, h, HAL_PIXEL_FORMAT_RGB_565);
-    //CALL_WIN(set_buffers_geometry, w, h, HAL_PIXEL_FORMAT_YV12); // 3 plannar
+    CALL_WIN(set_buffers_geometry, w, h, HAL_PIXEL_FORMAT_YV12); // 3 plannar
     //CALL_WIN(set_buffers_geometry, w, h, HAL_PIXEL_FORMAT_YCrCb_420_SP); // 2 plannar
 
     if (_previewState == PREVIEW_PENDING) {
@@ -173,10 +166,10 @@ status_t CameraHardware::storeMetaDataInBuffers(bool enable)
 }
 
 void CameraHardware::setCallbacks(camera_notify_callback notify_cb,
-                                     camera_data_callback data_cb,
-                                     camera_data_timestamp_callback data_cb_timestamp,
-                                     camera_request_memory req_memory,
-                                     void* user)
+                                  camera_data_callback data_cb,
+                                  camera_data_timestamp_callback data_cb_timestamp,
+                                  camera_request_memory req_memory,
+                                  void* user)
 {
     _cbNotify           = notify_cb;
     _cbData             = data_cb;
@@ -202,7 +195,9 @@ bool CameraHardware::msgTypeEnabled(int32_t msgType)
 
 // ---------------------------------------------------------------------------
 
-int CameraHardware::_fillWindow(char* previewFrame, int width, int height)
+status_t CameraHardware::_fillWindow(const char* previewFrame,
+                                     int width, int height,
+                                     const char* strPixfmt)
 {
     if (_window == NULL) {
         LOGE("%s: No window!", __func__);
@@ -219,45 +214,48 @@ int CameraHardware::_fillWindow(char* previewFrame, int width, int height)
 
     const Rect bounds(width, height);
     GraphicBufferMapper& grbuffer_mapper(GraphicBufferMapper::get());
-    void* vaddr = NULL;
 
-#if 0
-    mGrallocHal->lock(mGrallocHal, *buf_handle,
-                      GRALLOC_USAGE_SW_WRITE_OFTEN /*| GRALLOC_USAGE_YUV_ADDR*/,
-                      0, 0, width, height, vaddr_rgb))
-#endif
-
-    status_t res = grbuffer_mapper.lock(*buf, GRALLOC_USAGE_SW_WRITE_OFTEN, bounds, &vaddr);
-    if (res != NO_ERROR || vaddr == NULL) {
-    LOGE("%s: grbuffer_mapper.lock failure: %d -> %s",
-         __FUNCTION__, res, strerror(res));
+    void* vaddr[3];
+    int grallocUsage = GRALLOC_USAGE_SW_WRITE_OFTEN | GRALLOC_USAGE_YUV_ADDR;
+    status_t res = grbuffer_mapper.lock(*buf, grallocUsage,
+                                        bounds, vaddr);
+    if (res != NO_ERROR) {
+        LOGE("%s: grbuffer_mapper.lock failure: %d -> %s",
+             __func__, res, strerror(res));
         CALL_WIN(cancel_buffer, buf);
         return UNKNOWN_ERROR;
     }
 
-    // TODO: this assume windown and preview both are RGB565
-    memcpy(vaddr, previewFrame, width* height * 2);
-
-#if 0
-    char* src_y = previewFrame;
-    char* src_u = src_y + (width * height);
-    char* src_v = src_u + (width * height / 4);
-
-    memcpy(vaddr_yuv[0], src_v, width* height / 2);
-    memcpy(vaddr_yuv[1], src_v, width* height / 4);
-    memcpy(vaddr_yuv[2], src_u, width* height / 4);
-#endif
-
-#if 0
-    libyuv::NV12ToRGB565((const uint8*)src_y, width,
-                         (const uint8*)src_u, width >> 1,
-                         (uint8*)vaddr_rgb[0], width * 2, width, height);
-#endif
+    if (!strcmp(strPixfmt, CameraParameters::PIXEL_FORMAT_YUV420P)) {
+        const uint8* src_y = (const uint8*)previewFrame;
+        const uint8* src_v = src_y + (width * height);
+        const uint8* src_u = src_v + (width * height / 4);
+        libyuv::I420Copy(src_y, width,
+                         src_u, width / 2,
+                         src_v, width / 2,
+                         (uint8*)vaddr[0], stride,
+                         (uint8*)vaddr[1], stride / 2,
+                         (uint8*)vaddr[2], stride / 2,
+                         width, height);
+    } else if (!strcmp(strPixfmt, CameraParameters::PIXEL_FORMAT_YUV420SP)) {
+        const uint8* src_y = (const uint8*)previewFrame;
+        const uint8* src_uv = src_y + (width * height);
+        libyuv::NV12ToI420(src_y, width,
+                           src_uv, width,
+                           (uint8*)vaddr[0], stride,
+                           (uint8*)vaddr[1], stride / 2,
+                           (uint8*)vaddr[2], stride / 2,
+                           width, height);
+    } else {
+        LOGE("%s: Unsupported preview format, %s!", __func__, strPixfmt);
+        CALL_WIN(cancel_buffer, buf);
+        return UNKNOWN_ERROR;
+    }
 
     /* Show it. */
     CALL_WIN(enqueue_buffer, buf);
 
-    // Post the filled buffer!
+    /* Post the filled buffer */
     grbuffer_mapper.unlock(*buf);
 
     return NO_ERROR;
@@ -265,7 +263,6 @@ int CameraHardware::_fillWindow(char* previewFrame, int width, int height)
 
 bool CameraHardware::_previewLoop()
 {
-    // while (1) {
     _previewLock.lock();
     while (_previewState != PREVIEW_RUNNING
             && _previewState != PREVIEW_RECORDING) {
@@ -296,33 +293,13 @@ bool CameraHardware::_previewLoop()
     int w, h, frameSize;
     _camera->getPreviewFrameSize(&w, &h, &frameSize);
     int offset =  frameSize * index;
-    _fillWindow(((char*)_previewHeap->data) + offset, w, h);
+    const char* preview_format = _parms.getPreviewFormat();
+    _fillWindow(((const char*)_previewHeap->data) + offset, w, h, preview_format);
 
-#if 0
     // Notify the client of a new frame.
     if (_cbData && (_msgs & CAMERA_MSG_PREVIEW_FRAME)) {
-        const char* preview_format = _parms.getPreviewFormat();
-        if (!strcmp(preview_format, CameraParameters::PIXEL_FORMAT_YUV420SP)) {
-            // Color conversion from YUV420 to NV21
-            char* vu = ((char*)_previewHeap->data) + offset + w * h;
-            const int uv_size = (w * h) >> 1;
-            char saved_uv[uv_size];
-            memcpy(saved_uv, vu, uv_size);
-            char* u = saved_uv;
-            char* v = u + (uv_size >> 1);
-
-            int h = 0;
-            while (h < w * h / 4) {
-                *vu++ = *v++;
-                *vu++ = *u++;
-                ++h;
-            }
-        }
         _cbData(CAMERA_MSG_PREVIEW_FRAME, _previewHeap, index, NULL, _cbCookie);
     }
-#endif
-
-    //_fillWindow(((char*)_previewHeap->data) + offset, w, h);
 
     _previewLock.lock();
     if (_previewState == PREVIEW_RECORDING) {
@@ -348,7 +325,7 @@ bool CameraHardware::_previewLoop()
         }
     }
     _previewLock.unlock();
-    // }
+
     return true;
 }
 
@@ -699,7 +676,7 @@ status_t CameraHardware::cancelPicture()
 }
 
 bool CameraHardware::_isParamUpdated(const CameraParameters& newParams,
-                                        const char* key, const char* newValue) const
+                                     const char* key, const char* newValue) const
 {
     if (NULL == newValue) {
         LOGV("%s: no value to compare for %s!!", __func__, key);
@@ -721,7 +698,7 @@ bool CameraHardware::_isParamUpdated(const CameraParameters& newParams,
 }
 
 bool CameraHardware::_isParamUpdated(const CameraParameters& newParams,
-                                        const char* key, int newValue) const
+                                     const char* key, int newValue) const
 {
     if (NULL == _parms.get(key)) {
         LOGV("%s: _parms has no key, %s", __func__, key);
@@ -908,7 +885,7 @@ CameraParameters CameraHardware::getParameters() const
 }
 
 status_t CameraHardware::sendCommand(int32_t command, int32_t arg1,
-                                        int32_t arg2)
+                                     int32_t arg2)
 {
     return BAD_VALUE;
 }

@@ -7,8 +7,8 @@ const char* camera_info_get_default_camera_param_str(int camera_id)
     static const char *back_cam_init_params_str =
         "preview-size=720x480;"
         "preview-size-values=1280x720,720x480,720x480,640x480,320x240,176x144;"
-        "preview-format=rgb565;"
-        "preview-format-values=yuv420sp,rgb565;"
+        "preview-format=yuv420sp;"
+        "preview-format-values=yuv420sp,yuv420p;"
         "preview-frame-rate=30;"
         "preview-frame-rate-values=7,15,30;"
         "preview-fps-range=15000,30000;"
