@@ -25,8 +25,6 @@
 
 namespace android {
 
-#define MAX_CAM_BUFFERS	(8)
-
 struct v4l2Buffer {
     void*   start;
     size_t  length;
@@ -42,12 +40,9 @@ public:
 
     int setFmt(int w, int h, unsigned int fmt, int flag);
     int reqBufs(enum v4l2_buf_type t, int n);
-    int queryBuf(struct v4l2Buffer* bufs, enum v4l2_buf_type type);
     int queryBufs(struct v4l2Buffer* bufs, enum v4l2_buf_type type, int n);
-    int initBuf(struct v4l2Buffer* buf, int w, int h, int fmt);
-    int initBufs(struct v4l2Buffer* bufs, int w, int h, int fmt);
-    int closeBuf(struct v4l2Buffer* buf);
-    int closeBufs(struct v4l2Buffer* bufs);
+    int initBufs(struct v4l2Buffer* bufs, int w, int h, int fmt, int n);
+    int closeBufs(struct v4l2Buffer* bufs, int n);
     int startStream(bool on);
     int qbuf(int idx);
     int dqbuf(void);

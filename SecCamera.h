@@ -27,37 +27,13 @@ namespace android {
 
 #define DUAL_PORT_RECORDING //Define this if 2 fimc ports are needed for recording.
 
-#if defined(LOG_NDEBUG) && LOG_NDEBUG == 0
-#define LOG_CAMERA LOGD
-#define LOG_CAMERA_PREVIEW LOGD
-
-#define LOG_TIME_START(n) \
-    struct timeval time_start_##n, time_stop_##n; \
-    unsigned long log_time_##n = 0; \
-    gettimeofday(&time_start_##n, NULL)
-
-#define LOG_TIME_END(n) \
-    gettimeofday(&time_stop_##n, NULL); \
-    log_time_##n = measure_time(&time_start_##n, &time_stop_##n)
-
-#define LOG_TIME(n) \
-    log_time_##n
-
-#else
-#define LOG_CAMERA(...)
-#define LOG_CAMERA_PREVIEW(...)
-#define LOG_TIME_START(n)
-#define LOG_TIME_END(n)
-#define LOG_TIME(n)
-#endif
-
-
 #define CAMERA_DEV_NAME         "/dev/video0"
 
 #ifdef DUAL_PORT_RECORDING
 #define CAMERA_DEV_NAME2        "/dev/video2"
 #endif
 
+#define MAX_CAM_BUFFERS         (8)
 
 class SecCamera {
 public:
@@ -149,8 +125,6 @@ private:
     void                _initParms(void);
     int                 _getPhyAddr(int index, unsigned int* addrY, unsigned int* addrC);
 };
-
-extern unsigned long measure_time(struct timeval* start, struct timeval* stop);
 
 }; // namespace android
 

@@ -14,9 +14,10 @@
  * limitations under the License.
  */
 
-#define LOG_NDEBUG 0
+//#define LOG_NDEBUG 0
 #define LOG_TAG "SecV4L2Adapter"
 #include <utils/Log.h>
+#include "CameraLog.h"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -371,6 +372,7 @@ SecV4L2Adapter::~SecV4L2Adapter()
 
 int SecV4L2Adapter::_openCamera(const char* path)
 {
+    LOG_CAMERA_FUNC_ENTER;
     if (_fd) {
         LOGW("fd(%d) already opened. close it first!", _fd);
         close(_fd);
@@ -493,6 +495,7 @@ int SecV4L2Adapter::setFmt(int w, int h, unsigned int fmt, int flag)
 
 int SecV4L2Adapter::reqBufs(enum v4l2_buf_type t, int n)
 {
+    LOG_CAMERA_FUNC_ENTER;
     struct v4l2_requestbuffers req;
     int ret;
 
@@ -514,43 +517,9 @@ int SecV4L2Adapter::reqBufs(enum v4l2_buf_type t, int n)
     return req.count;
 }
 
-int SecV4L2Adapter::queryBuf(struct v4l2Buffer* buf, enum v4l2_buf_type type)
-{
-    struct v4l2_buffer v4l2_buf;
-    int i, ret;
-
-    if (_fd == 0) {
-        LOGE("%s: camera not opened!", __func__);
-        return -1;
-    }
-
-    v4l2_buf.type = type;
-    v4l2_buf.memory = V4L2_MEMORY_MMAP;
-    v4l2_buf.index = 0;
-
-    ret = ioctl(_fd, VIDIOC_QUERYBUF, &v4l2_buf);
-    if (ret < 0) {
-        LOGE("ERR(%s):VIDIOC_QUERYBUF failed\n", __func__);
-        return -1;
-    }
-
-    buf->length = v4l2_buf.length;
-
-    if ((buf->start = (char*)mmap(0, v4l2_buf.length,
-                                  PROT_READ | PROT_WRITE, MAP_SHARED,
-                                  _fd, v4l2_buf.m.offset)) < 0) {
-        LOGE("%s %d] mmap() failed\n", __func__, __LINE__);
-        return -1;
-    }
-
-    LOGV("buf->start = %p v4l2_buf.length = %d",
-         buf->start, v4l2_buf.length);
-
-    return 0;
-}
-
 int SecV4L2Adapter::queryBufs(struct v4l2Buffer* bufs, enum v4l2_buf_type type, int n)
 {
+    LOG_CAMERA_FUNC_ENTER;
     struct v4l2_buffer v4l2_buf;
     int i, ret;
 
@@ -591,6 +560,7 @@ int SecV4L2Adapter::queryBufs(struct v4l2Buffer* bufs, enum v4l2_buf_type type, 
 
 int SecV4L2Adapter::startStream(bool on)
 {
+    LOG_CAMERA_FUNC_ENTER;
     enum v4l2_buf_type type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     int ret;
 
@@ -823,21 +793,14 @@ int SecV4L2Adapter::waitFrame(void)
     return 0;
 }
 
-int SecV4L2Adapter::initBuf(struct v4l2Buffer* buf, int w, int h, int fmt)
+int SecV4L2Adapter::initBufs(struct v4l2Buffer* bufs, int w, int h, int fmt, int n)
 {
-    buf->start = NULL;
-    buf->length = frameSize(w, h, fmt);
-
-    return 0;
-}
-
-int SecV4L2Adapter::initBufs(struct v4l2Buffer* bufs, int w, int h, int fmt)
-{
+    LOG_CAMERA_FUNC_ENTER;
     int i, len;
 
     len = frameSize(w, h, fmt);
 
-    for (i = 0; i < MAX_CAM_BUFFERS; i++) {
+    for (i = 0; i < n; i++) {
         bufs[i].start = NULL;
         bufs[i].length = len;
     }
@@ -845,23 +808,12 @@ int SecV4L2Adapter::initBufs(struct v4l2Buffer* bufs, int w, int h, int fmt)
     return 0;
 }
 
-int SecV4L2Adapter::closeBuf(struct v4l2Buffer* buf)
+int SecV4L2Adapter::closeBufs(struct v4l2Buffer* bufs, int n)
 {
-    if (buf->start) {
-        munmap(buf->start, buf->length);
-        LOGV("munmap():virt. start = 0x%x, size = %d\n",
-             (unsigned int) buf->start, buf->length);
-        buf->start = NULL;
-    }
-
-    return 0;
-}
-
-int SecV4L2Adapter::closeBufs(struct v4l2Buffer* bufs)
-{
+    LOG_CAMERA_FUNC_ENTER;
     int i;
 
-    for (i = 0; i < MAX_CAM_BUFFERS; i++) {
+    for (i = 0; i < n; i++) {
         if (bufs[i].start) {
             munmap(bufs[i].start, bufs[i].length);
             LOGV("munmap():virt. addr[%d]: 0x%x size = %d\n",

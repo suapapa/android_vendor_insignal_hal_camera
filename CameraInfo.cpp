@@ -39,7 +39,7 @@ const char* camera_info_get_default_camera_param_str(int camera_id)
         "scene-mode=auto;"
         "scene-mode-values=auto,portrait,night,landscape,sports,party,snow,sunset,fireworks,candlelight;"
         "focus-mode=auto;"
-        "focus-mode-values=auto,macro;"
+        "focus-mode-values=auto,macro,infinity;"
         "video-frame-format=yuv420sp;"
         "focal-length=343";
 

@@ -37,8 +37,6 @@ struct ADDRS {
     unsigned int buf_idx;
 };
 
-#define MAX_CAM_BUFFERS    (8)
-
 #define CALL_WIN(F, ...)                                        \
     if (_window) {                                              \
         if (_window->F(_window, __VA_ARGS__)) {                 \
@@ -274,12 +272,11 @@ bool CameraHardware::_previewLoop()
     }
     _previewLock.unlock();
 
-    LOGI("staring preview...");
     int index;
     int ret = _camera->getPreviewBuffer(&index, NULL, NULL);
-    if (0 > ret) {
-        LOGE("%s: Faile to get PhyAddr for Preview!", __func__);
-        return false;
+    if (0 > ret || 0 > index) {
+        LOGW("Is preview frame not readied?");
+        return true;
     }
     nsecs_t timestamp = systemTime(SYSTEM_TIME_MONOTONIC);
 
@@ -373,7 +370,7 @@ status_t CameraHardware::startPreview()
 
     _previewState = PREVIEW_PENDING;
     if (_window == NULL) {
-        LOGW("%s: No preview window set yet. preview will be started "
+        LOGV("%s: No preview window set yet. preview will be started "
              "when a window is set.", __func__);
         return NO_ERROR;
     }
@@ -463,8 +460,6 @@ void CameraHardware::stopRecording()
 
 bool CameraHardware::recordingEnabled()
 {
-    LOGV("%s :", __func__);
-
     Mutex::Autolock lock(_previewLock);
 
     return (_previewState == PREVIEW_RECORDING);
@@ -742,7 +737,8 @@ status_t CameraHardware::setParameters(const CameraParameters& parms)
         LOGV("setting preview format to %dx%d(%s)...", width, height, strPixfmt);
         err = _camera->setPreviewFormat(width, height, strPixfmt);
         if (!err) {
-#if defined(BOARD_USES_CAMERA_OVERLAY)
+#if 1
+            LOGE("TODO: preview format changed! %dx%d(%s)", width, height, strPixfmt);
 #endif
             _parms.setPreviewSize(width, height);
             _parms.setPreviewFormat(strPixfmt);

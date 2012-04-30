@@ -18,48 +18,17 @@
 //#define LOG_NDEBUG 0
 #define LOG_TAG "SecCamera"
 #include <utils/Log.h>
+#include "CameraLog.h"
 
 #include "SecCamera.h"
 #include "ExynosHWJpeg.h"
 
 using namespace android;
 
-#define CHECK(T)                                \
-    if (!(T)) {                                 \
-        LOGE("%s+%d: Expected %s but failed!!", \
-                __func__, __LINE__, #T);        \
-    }
-
-#define CHECK_EQ(A, B)                          \
-    if (!(A == B)) {                            \
-        LOGE("%s+%d: Expected %s(%d) == %s(%d)!!", \
-                __func__, __LINE__, #A, A, #B, B);     \
-    }
 namespace android {
 
 // ======================================================================
 // Camera controls
-static struct timeval time_start;
-static struct timeval time_stop;
-
-unsigned long measure_time(struct timeval* start, struct timeval* stop)
-{
-    unsigned long sec, usec, time;
-
-    sec = stop->tv_sec - start->tv_sec;
-
-    if (stop->tv_usec >= start->tv_usec) {
-        usec = stop->tv_usec - start->tv_usec;
-    } else {
-        usec = stop->tv_usec + 1000000 - start->tv_usec;
-        sec--;
-    }
-
-    time = (sec * 1000000) + usec;
-
-    return time;
-}
-
 void SecCamera::releaseRecordFrame(int i)
 {
     LOGV("releaseframe : (%d)", i);
@@ -171,19 +140,20 @@ int SecCamera::startPreview(void)
     int ret = 0;
 
     ret = _v4l2Cam->setFmt(_previewWidth, _previewHeight, _previewPixfmt, 0);
-    CHECK(ret == 0);
+    CHECK_EQ(ret, 0);
 
-    _v4l2Cam->initBufs(_previewBufs, _previewWidth, _previewHeight, _previewPixfmt);
+    _v4l2Cam->initBufs(_previewBufs, _previewWidth, _previewHeight,
+                       _previewPixfmt, MAX_CAM_BUFFERS);
     ret = _v4l2Cam->reqBufs(V4L2_BUF_TYPE_VIDEO_CAPTURE, MAX_CAM_BUFFERS);
-    CHECK(ret == MAX_CAM_BUFFERS);
+    CHECK_EQ(ret, MAX_CAM_BUFFERS);
 
     ret = _v4l2Cam->queryBufs(_previewBufs, V4L2_BUF_TYPE_VIDEO_CAPTURE, MAX_CAM_BUFFERS);
-    CHECK(ret == 0);
+    CHECK_EQ(ret, 0);
 
     /* start with all buffers in queue */
     for (int i = 0; i < MAX_CAM_BUFFERS; i++) {
         ret = _v4l2Cam->qbuf(i);
-        CHECK(ret == 0);
+        CHECK_EQ(ret, 0);
     }
 
     ret = _v4l2Cam->startStream(true);
@@ -206,19 +176,17 @@ int SecCamera::startPreview(void)
 
 int SecCamera::stopPreview(void)
 {
-    LOGV("++%s() \n", __func__);
+    LOG_CAMERA_FUNC_ENTER;
 
     if (_isPreviewOn == false)
         return 0;
 
-    _v4l2Cam->closeBufs(_previewBufs);
-
     int ret = _v4l2Cam->startStream(false);
     CHECK(ret == 0);
 
+    _v4l2Cam->closeBufs(_previewBufs, MAX_CAM_BUFFERS);
     _isPreviewOn = false; //Kamat check
 
-    LOGV("--%s() \n", __func__);
     return 0;
 }
 
@@ -239,7 +207,8 @@ int SecCamera::startRecord(void)
     ret = _v4l2Rec->setFmt(_previewWidth, _previewHeight, color_format, 0);
     CHECK(ret == 0);
 
-    _v4l2Rec->initBufs(_recordBufs, _previewWidth, _previewHeight, _previewPixfmt);
+    _v4l2Cam->initBufs(_recordBufs, _previewWidth, _previewHeight,
+                       _previewPixfmt, MAX_CAM_BUFFERS);
     ret = _v4l2Rec->reqBufs(V4L2_BUF_TYPE_VIDEO_CAPTURE, MAX_CAM_BUFFERS);
     CHECK(ret == 0);
 
@@ -276,12 +245,13 @@ int SecCamera::stopRecord(void)
     if (_isRecordOn == false)
         return 0;
 
-    _v4l2Rec->closeBufs(_recordBufs);
 
     int ret = _v4l2Rec->startStream(false);
     CHECK(ret == 0);
 
+    _v4l2Rec->closeBufs(_recordBufs, MAX_CAM_BUFFERS);
     _isRecordOn = false;
+
     LOGI("Recording stopped!");
 
     return 0;
@@ -385,7 +355,7 @@ void SecCamera::getPreviewFrameSize(int* width, int* height, int* frameSize)
 // Snapshot
 int SecCamera::endSnapshot(void)
 {
-    return _v4l2Cam->closeBuf(&_captureBuf);
+    return _v4l2Cam->closeBufs(&_captureBuf, 1);
 }
 
 int SecCamera::startSnapshot(void)
@@ -398,9 +368,9 @@ int SecCamera::startSnapshot(void)
     CHECK(ret == 0);
 
     LOG_TIME_START(1); // prepare
-    _v4l2Cam->initBuf(&_captureBuf, _snapshotWidth, _snapshotHeight, _snapshotPixfmt);
+    _v4l2Cam->initBufs(&_captureBuf, _snapshotWidth, _snapshotHeight, _snapshotPixfmt, 1);
     _v4l2Cam->reqBufs(V4L2_BUF_TYPE_VIDEO_CAPTURE, 1);
-    _v4l2Cam->queryBuf(&_captureBuf, V4L2_BUF_TYPE_VIDEO_CAPTURE);
+    _v4l2Cam->queryBufs(&_captureBuf, V4L2_BUF_TYPE_VIDEO_CAPTURE, 1);
     _v4l2Cam->qbuf(0);
     _v4l2Cam->startStream(true);
     LOG_TIME_END(1);
