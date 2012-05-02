@@ -256,19 +256,28 @@ status_t CameraHardware::_fillWindow(const char* previewFrame,
 bool CameraHardware::_previewLoop()
 {
     _previewLock.lock();
-    while (_previewState != PREVIEW_RUNNING
-            && _previewState != PREVIEW_RECORDING) {
-        LOGI("%s: calling _camera->stopPreview() and waiting", __func__);
-        _camera->stopPreview();
-        if (_previewState == PREVIEW_ABORT) {
-            LOGI("Exiting preview thread...");
-            _previewLock.unlock();
-            return false;
-        }
+    switch (_previewState) {
+    case PREVIEW_RUNNING:
+    case PREVIEW_RECORDING:
+        break;
 
+    case PREVIEW_IDLE:
+    case PREVIEW_PENDING:
+        _camera->stopPreview();
+
+        LOGI("%s: calling _camera->stopPreview() and waiting", __func__);
         // signal that we're stopped
         _previewStoppedCondition.signal();
         _previewStateChangedCondition.wait(_previewLock);
+        LOGI("preview state changed _previewState = %d", _previewState);
+        _previewLock.unlock();
+        return true;
+
+    case PREVIEW_ABORT:
+    default:
+        LOGI("Exiting preview thread...");
+        _previewLock.unlock();
+        return false;
     }
     _previewLock.unlock();
 
@@ -475,6 +484,8 @@ bool CameraHardware::_focusLoop()
 {
     Mutex::Autolock lock(_focusLock);
 
+    LOGI("_focusState = %d", _focusState);
+
     switch (_focusState) {
     case FOCUS_IDLE:
         _focusStateChangedCondition.wait(_focusLock);
@@ -534,15 +545,11 @@ status_t CameraHardware::cancelAutoFocus()
     LOGI("%s: AF canceling... current state is %d",
          __func__, _focusState);
 
-    _focusState = FOCUS_IDLE;
-
-    //TODO: is it cancleable?
-#if 0
     if (_camera->abortAutoFocus() < 0) {
         LOGE("ERR(%s):Fail on _camera->cancelAutofocus()", __func__);
         return UNKNOWN_ERROR;
     }
-#endif
+    _focusState = FOCUS_IDLE;
 
     return NO_ERROR;
 }
@@ -730,16 +737,12 @@ status_t CameraHardware::setParameters(const CameraParameters& parms)
     // preview-size and preview-format
     strSize = parms.get(CameraParameters::KEY_PREVIEW_SIZE);
     strPixfmt = parms.get(CameraParameters::KEY_PREVIEW_FORMAT);
-    if (_previewState != PREVIEW_RUNNING
-            || _isParamUpdated(parms, CameraParameters::KEY_PREVIEW_SIZE, strSize)
+    if (_isParamUpdated(parms, CameraParameters::KEY_PREVIEW_SIZE, strSize)
             || _isParamUpdated(parms, CameraParameters::KEY_PREVIEW_FORMAT, strPixfmt)) {
         parms.getPreviewSize(&width, &height);
         LOGV("setting preview format to %dx%d(%s)...", width, height, strPixfmt);
         err = _camera->setPreviewFormat(width, height, strPixfmt);
         if (!err) {
-#if 1
-            LOGE("TODO: preview format changed! %dx%d(%s)", width, height, strPixfmt);
-#endif
             _parms.setPreviewSize(width, height);
             _parms.setPreviewFormat(strPixfmt);
         }
@@ -748,8 +751,7 @@ status_t CameraHardware::setParameters(const CameraParameters& parms)
     // picture-size and picture-format
     strSize = parms.get(CameraParameters::KEY_PICTURE_SIZE);
     strPixfmt = parms.get(CameraParameters::KEY_PICTURE_FORMAT);
-    if (_previewState != PREVIEW_RUNNING
-            || _isParamUpdated(parms, CameraParameters::KEY_PICTURE_SIZE, strSize)
+    if (_isParamUpdated(parms, CameraParameters::KEY_PICTURE_SIZE, strSize)
             || _isParamUpdated(parms, CameraParameters::KEY_PICTURE_FORMAT, strPixfmt)) {
         parms.getPictureSize(&width, &height);
         LOGV("setting picture format to %dx%d(%s)...", width, height, strPixfmt);

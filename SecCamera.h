@@ -33,7 +33,7 @@ namespace android {
 #define CAMERA_DEV_NAME2        "/dev/video2"
 #endif
 
-#define MAX_CAM_BUFFERS         (8)
+#define MAX_CAM_BUFFERS         (4)
 
 class SecCamera {
 public:

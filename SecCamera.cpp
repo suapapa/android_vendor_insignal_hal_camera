@@ -210,10 +210,10 @@ int SecCamera::startRecord(void)
     _v4l2Cam->initBufs(_recordBufs, _previewWidth, _previewHeight,
                        _previewPixfmt, MAX_CAM_BUFFERS);
     ret = _v4l2Rec->reqBufs(V4L2_BUF_TYPE_VIDEO_CAPTURE, MAX_CAM_BUFFERS);
-    CHECK(ret == 0);
+    CHECK_EQ(ret, MAX_CAM_BUFFERS);
 
     ret = _v4l2Rec->queryBufs(_recordBufs, V4L2_BUF_TYPE_VIDEO_CAPTURE, MAX_CAM_BUFFERS);
-    CHECK(ret == 0);
+    CHECK_EQ(ret, 0);
 
     /* start with all buffers in queue */
     for (int i = 0; i < MAX_CAM_BUFFERS; i++) {
@@ -226,7 +226,7 @@ int SecCamera::startRecord(void)
 
     // It is a delay for a new frame, not to show the previous bigger ugly picture frame.
     ret = _v4l2Rec->waitFrame();
-    CHECK(ret > 0);
+    CHECK_EQ(ret, 0);
 
     int index = _v4l2Rec->dqbuf();
     ret = _v4l2Rec->qbuf(index);
