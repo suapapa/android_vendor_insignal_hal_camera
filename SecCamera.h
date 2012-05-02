@@ -2,7 +2,7 @@
  *
  * Copyright 2008, The Android Open Source Project
  * Copyright 2010, Samsung Electronics Co. LTD
- * Copyright (C) 2012 Insignal Co, Ltd.
+ * Copyright 2012, Insignal Co, Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,7 +21,8 @@
 #define __ANDROID_HARDWARE_LIBCAMERA_SEC_CAMERA_H__
 
 #include "SecV4L2Adapter.h"
-#include "JpegInterface.h"
+#include "EncoderInterface.h"
+#include "TaggerInterface.h"
 
 namespace android {
 
@@ -76,6 +77,9 @@ public:
     void                setFrameRate(int frame_rate);
     int                 setZoom(int zoom);
 
+    int                 setPictureQuality(int q);
+    int                 setThumbQuality(int q);
+    int                 setJpegThumbnailSize(int width, int height);
 
     int                 startSnapshot(void);
     int                 getSnapshot(int xth = 0);
@@ -83,16 +87,22 @@ public:
     int                 getJpegSnapshot(uint8_t* buffer, unsigned int size);
     int                 endSnapshot(void);
 
-    int                 setJpegThumbnailSize(int width, int height);
-    int                 setJpegQuality(int quality);
-    int                 setGpsInfo(double latitude, double longitude,
-                                   unsigned int timestamp, int altitude);
+    int                 compress2Jpeg(unsigned char* rawData, int rawSize);
+    int                 getJpeg(unsigned char* outBuff, int buffSize);
 
+    int                 setGpsInfo(const char* strLatitude,
+                                   const char* strLongitude,
+                                   const char* strAltitude,
+                                   const char* strTimestamp = NULL,
+                                   const char* strProcessMethod = NULL,
+                                   int nALtitudeRef = 0,
+                                   const char* strMapDatum = NULL,
+                                   const char* strGpsVersion = NULL);
 
     int                 getFd(void);
 
 private:
-    struct sec_cam_parm _parms;
+    struct sec_cam_parm _v4l2Params;
 
     bool                _isInited;
 
@@ -119,11 +129,22 @@ private:
     SecV4L2Adapter*     _v4l2Cam;
     SecV4L2Adapter*     _v4l2Rec;
 
-    JpegInterface*      _jpeg;
+    EncoderInterface*   _encoder;
+    EncoderParams       _pictureParams;
+    EncoderParams       _thumbParams;
 
     void                _release(void);
     void                _initParms(void);
     int                 _getPhyAddr(int index, unsigned int* addrY, unsigned int* addrC);
+
+    TaggerInterface*    _tagger;
+    TaggerParams        _exifParams;
+    void                _initExifParams(void);
+
+    int                 _convertGPSCoord(double coord, int* deg, int* min, int* sec);
+    int                 _scaleDownYuv422(uint8_t* srcBuf, uint32_t srcWidth, uint32_t srcHight,
+                                         uint8_t* dstBuf, uint32_t dstWidth, uint32_t dstHight);
+    int                 _createThumbnail(uint8_t* rawData, int rawSize);
 };
 
 }; // namespace android

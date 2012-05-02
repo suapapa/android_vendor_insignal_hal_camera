@@ -14,29 +14,28 @@
  * limitations under the License.
  */
 
-#ifndef __ANDROID_HARDWARE_LIBCAMERA_EXYNOS_HW_JPEG_H__
-#define __ANDROID_HARDWARE_LIBCAMERA_EXYNOS_HW_JPEG_H__
+#ifndef __LIBCAMERA_S5PJPEG_ENCODER_H__
+#define __LIBCAMERA_S5PJPEG_ENCODER_H__
 
+#include "EncoderInterface.h"
 #include "jpeg_api.h"
-#include "JpegInterface.h"
 
 namespace android {
 
-class ExynosHWJpeg : public JpegInterface {
+class S5PJpegEncoder : public EncoderInterface {
 public:
-    ExynosHWJpeg();
-    ~ExynosHWJpeg();
+    S5PJpegEncoder();
+    ~S5PJpegEncoder();
 
-    virtual int setImgFormat(int w, int h, int f);
+    virtual int setImgFormat(int w, int h, int f, int q = -1);
     virtual int doCompress(uint8_t* inBuff, int inBuffSize);
-    virtual int copyOutput(uint8_t* outBuff, int outBuffSize);
+    virtual int doCompress(EncoderParams* parm, uint8_t* inBuff, int inBuffSize);
+
+    virtual void getOutput(uint8_t** jpegBuff, int* jpegSize);
+    virtual int copyOutput(uint8_t* outBuff, int outBuffSize,
+                           bool skipSOI = false);
 
     virtual int setQuality(int q);
-    virtual int setThumbSize(int w, int h);
-    virtual int setThumbQuality(int q);
-
-    virtual int setRotate(int r);
-    virtual int setGps(double lat, double lon, unsigned int ts, short alt);
 
 private:
     int _fd;

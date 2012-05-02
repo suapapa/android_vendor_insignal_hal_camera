@@ -20,8 +20,12 @@
 #include <utils/Log.h>
 #include "CameraLog.h"
 
+#include <stdlib.h>
+#include <math.h>
+
 #include "SecCamera.h"
-#include "ExynosHWJpeg.h"
+#include "S5PJpegEncoder.h"
+//#include "ExifTagger.h"
 
 using namespace android;
 
@@ -57,7 +61,8 @@ SecCamera::SecCamera(const char* camPath, const char* recPath, int ch) :
     _isRecordOn(false),
     _v4l2Cam(NULL),
     _v4l2Rec(NULL),
-    _jpeg(NULL)
+    _encoder(NULL),
+    _tagger(NULL)
 {
     LOGV("%s()", __func__);
 
@@ -65,7 +70,8 @@ SecCamera::SecCamera(const char* camPath, const char* recPath, int ch) :
 #ifdef DUAL_PORT_RECORDING
     _v4l2Rec = new SecV4L2Adapter(recPath, ch);
 #endif
-    _jpeg = new ExynosHWJpeg();
+    _encoder = new S5PJpegEncoder();
+    //_tagger = new ExifTagger();
 
     if (_v4l2Cam->getFd() == 0 || _v4l2Rec->getFd() == 0) {
         _release();
@@ -101,8 +107,13 @@ SecCamera::~SecCamera()
 
 void SecCamera::_release(void)
 {
-    if (_jpeg)
-        delete _jpeg;
+    memset(&_exifParams, 0, sizeof(TaggerParams));
+
+    if (_encoder)
+        delete _encoder;
+
+    if (_tagger)
+        delete _tagger;
 
     if (_v4l2Cam)
         delete _v4l2Cam;
@@ -161,7 +172,7 @@ int SecCamera::startPreview(void)
 
     _isPreviewOn = true;
 
-    ret = _v4l2Cam->setParm(&_parms);
+    ret = _v4l2Cam->setParm(&_v4l2Params);
     CHECK_EQ(ret, 0);
 
     ret = _v4l2Cam->waitFrame();
@@ -441,12 +452,19 @@ int SecCamera::setSnapshotFormat(int width, int height, const char* strPixfmt)
     _snapshotFrameSize = _v4l2Cam->frameSize(_snapshotWidth, _snapshotHeight,
                          _snapshotPixfmt);
 
-    int ret = _jpeg->setImgFormat(_snapshotWidth, _snapshotHeight,
-                                  _snapshotPixfmt);
-    CHECK(ret == 0);
+    _pictureParams.width = _snapshotWidth;
+    _pictureParams.height = _snapshotHeight;
+    _pictureParams.format = _snapshotPixfmt;
+
+    // We will make thumbnail by shrink from original image
+    // So, same image format is used
+    _thumbParams.format = _snapshotPixfmt;
 
     LOGI("snapshotFormat=%dx%d(%s), frameSize=%d",
          width, height, strPixfmt, _snapshotFrameSize);
+
+    _exifParams.width = _snapshotWidth;
+    _exifParams.height = _snapshotHeight;
 
     return _snapshotFrameSize > 0 ? 0 : -1;
 }
@@ -519,20 +537,20 @@ int SecCamera::setRotate(int angle)
     if (angle >= 360 || 0 > angle)
         LOGW("%s: input angle, %d is truncated to %d!", __func__, angle, rotate);
 
-    _jpeg->setRotate(angle);
+    _exifParams.rotation = angle;
 
     return 0;
 }
 
 int SecCamera::setSceneMode(const char* strSceneMode)
 {
-    _parms.scene_mode = _v4l2Cam->enumSceneMode(strSceneMode);
+    _v4l2Params.scene_mode = _v4l2Cam->enumSceneMode(strSceneMode);
 
     if (!_isPreviewOn)
         return 0;
 
     int ret = _v4l2Cam->setCtrl(V4L2_CID_CAMERA_SCENE_MODE,
-                                _parms.scene_mode);
+                                _v4l2Params.scene_mode);
 
     LOGE_IF(0 > ret, "%s:Failed to set scene-mode, %s!! ret=%d",
             __func__, strSceneMode, ret);
@@ -542,13 +560,17 @@ int SecCamera::setSceneMode(const char* strSceneMode)
 
 int SecCamera::setWhiteBalance(const char* strWhiteBalance)
 {
-    _parms.white_balance = _v4l2Cam->enumWB(strWhiteBalance);
+    _v4l2Params.white_balance = _v4l2Cam->enumWB(strWhiteBalance);
+    if (_v4l2Params.white_balance == WHITE_BALANCE_AUTO)
+        _exifParams.wb = EXIF_WB_AUTO;
+    else
+        _exifParams.wb = EXIF_WB_MANUAL;
 
     if (!_isPreviewOn)
         return 0;
 
     int ret = _v4l2Cam->setCtrl(V4L2_CID_CAMERA_WHITE_BALANCE,
-                                _parms.white_balance);
+                                _v4l2Params.white_balance);
 
     LOGE_IF(0 > ret, "%s:Failed to set white-balance, %s!! ret=%d",
             __func__, strWhiteBalance, ret);
@@ -558,13 +580,13 @@ int SecCamera::setWhiteBalance(const char* strWhiteBalance)
 
 int SecCamera::setEffect(const char* strEffect)
 {
-    _parms.effects = _v4l2Cam->enumEffect(strEffect);
+    _v4l2Params.effects = _v4l2Cam->enumEffect(strEffect);
 
     if (!_isPreviewOn)
         return 0;
 
     int ret = _v4l2Cam->setCtrl(V4L2_CID_CAMERA_EFFECT,
-                                _parms.effects);
+                                _v4l2Params.effects);
 
     LOGE_IF(0 > ret, "%s:Failed to set effects, %s!! ret=%d",
             __func__, strEffect, ret);
@@ -574,11 +596,11 @@ int SecCamera::setEffect(const char* strEffect)
 
 int SecCamera::setFlashMode(const char* strFlashMode)
 {
-    _parms.flash_mode = _v4l2Cam->enumFlashMode(strFlashMode);
+    _v4l2Params.flash_mode = _v4l2Cam->enumFlashMode(strFlashMode);
 
     LOGV("setting flash-mode set to %s...", strFlashMode);
 
-    switch (_parms.flash_mode) {
+    switch (_v4l2Params.flash_mode) {
     case FLASH_MODE_TORCH:
         return 0;
 
@@ -595,7 +617,7 @@ int SecCamera::setFlashMode(const char* strFlashMode)
         return 0;
 
     int ret = _v4l2Cam->setCtrl(V4L2_CID_CAMERA_FLASH_MODE,
-                                _parms.flash_mode);
+                                _v4l2Params.flash_mode);
 
     LOGE_IF(0 > ret, "%s:Failed to set flash-mode, %s!! ret=%d",
             __func__, strFlashMode, ret);
@@ -605,13 +627,13 @@ int SecCamera::setFlashMode(const char* strFlashMode)
 
 int SecCamera::setBrightness(int brightness)
 {
-    _parms.brightness = _v4l2Cam->enumBrightness(brightness);
+    _v4l2Params.brightness = _v4l2Cam->enumBrightness(brightness);
 
     if (!_isPreviewOn)
         return 0;
 
     int ret = _v4l2Cam->setCtrl(V4L2_CID_CAMERA_BRIGHTNESS,
-                                _parms.brightness);
+                                _v4l2Params.brightness);
 
     LOGE_IF(0 > ret, "%s:Failed to set brightness, %d!! ret=%d",
             __func__, brightness, ret);
@@ -621,13 +643,13 @@ int SecCamera::setBrightness(int brightness)
 
 int SecCamera::setFocusMode(const char* strFocusMode)
 {
-    _parms.focus_mode = _v4l2Cam->enumFocusMode(strFocusMode);
+    _v4l2Params.focus_mode = _v4l2Cam->enumFocusMode(strFocusMode);
 
     if (!_isPreviewOn)
         return 0;
 
     int ret = _v4l2Cam->setCtrl(V4L2_CID_CAMERA_FOCUS_MODE,
-                                _parms.focus_mode);
+                                _v4l2Params.focus_mode);
 
     LOGE_IF(0 > ret, "%s:Failed to set focus-mode, %s!! ret=%d",
             __func__, strFocusMode, ret);
@@ -640,46 +662,279 @@ int SecCamera::setFocusMode(const char* strFocusMode)
 
 void SecCamera::_initParms(void)
 {
+    memset(&_pictureParams, 0, sizeof(EncoderParams));
+    memset(&_thumbParams, 0, sizeof(EncoderParams));
+
     // Initial setting values of camera sensor
-    _parms.brightness           = EV_DEFAULT;
-    _parms.effects              = IMAGE_EFFECT_NONE;
-    _parms.flash_mode           = FLASH_MODE_OFF;
-    _parms.white_balance        = WHITE_BALANCE_AUTO;
-    _parms.focus_mode           = FOCUS_MODE_AUTO;
-    _parms.contrast             = CONTRAST_DEFAULT;
-    _parms.iso                  = ISO_AUTO;
-    _parms.metering             = METERING_CENTER;
-    _parms.saturation           = SATURATION_DEFAULT;
-    _parms.scene_mode           = SCENE_MODE_NONE;
-    _parms.sharpness            = SHARPNESS_DEFAULT;
-    _parms.fps                  = FRAME_RATE_AUTO;
-    _parms.capture.timeperframe.numerator = 1;
-    _parms.capture.timeperframe.denominator = 30;
+    _v4l2Params.brightness           = EV_DEFAULT;
+    _v4l2Params.effects              = IMAGE_EFFECT_NONE;
+    _v4l2Params.flash_mode           = FLASH_MODE_OFF;
+    _v4l2Params.white_balance        = WHITE_BALANCE_AUTO;
+    _v4l2Params.focus_mode           = FOCUS_MODE_AUTO;
+    _v4l2Params.contrast             = CONTRAST_DEFAULT;
+    _v4l2Params.iso                  = ISO_AUTO;
+    _v4l2Params.metering             = METERING_CENTER;
+    _v4l2Params.saturation           = SATURATION_DEFAULT;
+    _v4l2Params.scene_mode           = SCENE_MODE_NONE;
+    _v4l2Params.sharpness            = SHARPNESS_DEFAULT;
+    _v4l2Params.fps                  = FRAME_RATE_AUTO;
+    _v4l2Params.capture.timeperframe.numerator = 1;
+    _v4l2Params.capture.timeperframe.denominator = 30;
 }
 
 // ======================================================================
 // Jpeg
-int SecCamera::getJpegSnapshot(uint8_t* buffer, unsigned int size)
+int SecCamera::_createThumbnail(uint8_t* rawData, int rawSize)
 {
-    _jpeg->doCompress((uint8_t*)_captureBuf.start,
-                      _captureBuf.length);
+    uint8_t* thumbRawData = NULL;
+    int thumbRawSize = 0;
 
-    return _jpeg->copyOutput(buffer, size);
+    int pW = _pictureParams.width;
+    int pH = _pictureParams.height;
+    int tW = _thumbParams.width;
+    int tH = _thumbParams.height;
+
+    LOGI("making thumb(%dx%d) from picture(%dx%d)...", tW, tH, pW, pH);
+    if (rawSize != pW * pH * 2) {
+        LOGE("%s: rawSize=%d, expected=%d", __func__, rawSize, pW * pH * 2);
+        goto nothumbnail;
+    }
+
+    if (tW > 0 && tH > 0) {
+        thumbRawSize = tW * tH * 2;
+        LOGV("making raw image for thumbnail(%dx%d)...", tW, tH);
+        thumbRawData = new uint8_t[thumbRawSize];
+    }
+
+    if (thumbRawData && thumbRawSize) {
+        LOGV("shrinking raw image for thumbnail...");
+        int ret = _scaleDownYuv422(rawData, pW, pH, thumbRawData, tW, tH);
+        if (ret != 0) {
+            LOGE("%s: somthing wrong while shrinking raw image for thumbnail!",
+                 __func__);
+            goto nothumbnail;
+        }
+
+        LOGV("compressing thumbnail...");
+        _encoder->doCompress(&_thumbParams, thumbRawData, thumbRawSize);
+
+        // now, JPEG data exists in _encoder. free rawdata.
+        delete[] thumbRawData;
+
+        uint8_t* thumbJpegData = NULL;
+        int thumbJpegSize = 0;
+        _encoder->getOutput(&thumbJpegData, &thumbJpegSize);
+        if (thumbJpegData && thumbJpegSize) {
+            LOGV("copying compressed thumbnail to TaggerParams...");
+
+            // It will be deleted from createTaggedJpeg.
+            _exifParams.thumb_data = new uint8_t[thumbJpegSize];
+            memcpy(_exifParams.thumb_data, thumbJpegData, thumbJpegSize);
+            _exifParams.thumb_size = thumbJpegSize;
+        }
+
+        return 0;
+    }
+
+nothumbnail:
+    LOGW("no thumbnail available!");
+
+    if (thumbRawData)
+        delete[] thumbRawData;
+
+    _exifParams.thumb_data = NULL;
+    _exifParams.thumb_size = 0;
+
+    return -1;
 }
 
-int SecCamera::setJpegQuality(int quality)
+int SecCamera::compress2Jpeg(unsigned char* rawData, int rawSize)
 {
-    return _jpeg->setQuality(quality);
+    int ret = 0;
+
+    _createThumbnail(rawData, rawSize);
+
+    LOGI("encording to JPEG...");
+    _encoder->doCompress(&_pictureParams, rawData, rawSize);
+
+    uint8_t* jpegBuff = NULL;
+    int jpegSize = 0;
+    _encoder->getOutput(&jpegBuff, &jpegSize);
+    if (0 > jpegSize)
+        return -1;
+
+    if (_tagger == NULL) {
+        LOGW("No tagger! jpeg will be served without tag");
+	return jpegSize;
+    }
+
+    LOGI("creating tagged JPEG...");
+    int taggedJpegSize = _tagger->createTaggedJpeg(&_exifParams, jpegBuff, jpegSize);
+
+    //TODO: release alloc memories in _encoder
+    // now, taggedJpeg data exists in _exif
+
+    return taggedJpegSize;
+}
+
+int SecCamera::getJpeg(unsigned char* outBuff, int buffSize)
+{
+    int writtenSize = 0;
+
+    if (_tagger) {
+        writtenSize = _tagger->copyJpegWithExif(outBuff, buffSize);
+    } else {
+        uint8_t* jpegBuff = NULL;
+        int jpegSize = 0;
+        _encoder->getOutput(&jpegBuff, &jpegSize);
+
+        memcpy(outBuff, jpegBuff, jpegSize);
+        writtenSize = jpegSize;
+    }
+
+    if (writtenSize > buffSize) {
+        LOGE("%s: buffer overflowed!!", __func__);
+        return -1;
+    }
+
+    if (!(writtenSize > 0)) {
+        LOGE("%s: Opps, nothing copied!!", __func__);
+        return -1;
+    }
+
+    return 0;
+}
+
+int SecCamera::setPictureQuality(int q)
+{
+    LOGI("%s: quality = %d", __func__, q);
+    _pictureParams.quality = q;
+    return 0;
+}
+
+int SecCamera::setThumbQuality(int q)
+{
+    LOGI("%s: quality = %d", __func__, q);
+    _thumbParams.quality = q;
+    return 0;
 }
 
 int SecCamera::setJpegThumbnailSize(int width, int height)
 {
-    return _jpeg->setThumbSize(width, height);
+    _thumbParams.width = width;
+    _thumbParams.height = height;
+    return 0;
 }
 
-int SecCamera::setGpsInfo(double latitude, double longitude, unsigned int timestamp, int altitude)
+int SecCamera::_convertGPSCoord(double coord, int* deg, int* min, int* sec)
 {
-    return _jpeg->setGps(latitude, longitude, timestamp, altitude);
+    double tmp;
+
+    if (coord == 0) {
+        LOGE("%s: Invalid GPS coordinate", __func__);
+
+        return -1;
+    }
+
+    *deg = (int) floor(coord);
+    tmp = (coord - floor(coord)) * 60;
+    *min = (int) floor(tmp);
+    tmp = (tmp - floor(tmp)) * 60;
+    *sec = (int) floor(tmp);
+
+    if (*sec >= 60) {
+        *sec = 0;
+        *min += 1;
+    }
+
+    if (*min >= 60) {
+        *min = 0;
+        *deg += 1;
+    }
+
+    return 0;
+}
+
+int SecCamera::setGpsInfo(const char* strLatitude, const char* strLongitude,
+                          const char* strAltitude, const char* strTimestamp,
+                          const char* strProcessMethod, int nAltitudeRef,
+                          const char* strMapDatum, const char* strGpsVersion)
+{
+    gps_data* gps = &_exifParams.gps_location;
+    double gpsCoord;
+
+    gpsCoord = strtod(strLatitude, NULL);
+    _convertGPSCoord(gpsCoord, &gps->latDeg, &gps->latMin, &gps->latSec);
+    gps->latRef = (gpsCoord < 0) ? (char*) "S" : (char*) "N";
+
+    gpsCoord = strtod(strLongitude, NULL);
+    _convertGPSCoord(gpsCoord, &gps->longDeg, &gps->longMin, &gps->longSec);
+    gps->longRef = (gpsCoord < 0) ? (char*) "W" : (char*) "E";
+
+    gpsCoord = strtod(strAltitude, NULL);
+    gps->altitude = gpsCoord;
+
+    if (NULL != strTimestamp) {
+        gps->timestamp = strtol(strTimestamp, NULL, 10);
+        struct tm* timeinfo = localtime((time_t*) & (gps->timestamp));
+        if (timeinfo != NULL)
+            strftime(gps->datestamp, 11, "%Y:%m:%d", timeinfo);
+    }
+
+    gps->altitudeRef = nAltitudeRef;
+    gps->mapdatum = (char*)strMapDatum;
+    gps->versionId = (char*)strGpsVersion;
+    gps->procMethod = (char*)strProcessMethod;
+
+    return 0;
+}
+
+void SecCamera::_initExifParams(void)
+{
+    LOGV("%s: setting default values for _exifParams...", __func__);
+    memset(&_exifParams, 0, sizeof(TaggerParams));
+    static const char* strMaker = "TJMedia";
+    static const char* strModel = "TDMK";
+    _exifParams.maker = (char*)strMaker;
+    _exifParams.model = (char*)strModel;
+    _exifParams.wb = EXIF_WB_AUTO;
+    _exifParams.metering_mode = EXIF_AVERAGE;
+    _exifParams.zoom = 1;
+    _exifParams.iso = EXIF_ISO_AUTO;
+    _exifParams.thumb_data = NULL;
+    _exifParams.thumb_size = 0;
+}
+
+int SecCamera::_scaleDownYuv422(uint8_t* srcBuf, uint32_t srcWidth, uint32_t srcHight,
+                                uint8_t* dstBuf, uint32_t dstWidth, uint32_t dstHight)
+{
+    int32_t step_x, step_y;
+    int32_t iXsrc, iXdst;
+    int32_t x, y, src_y_start_pos, dst_pos, src_pos;
+
+    if (dstWidth % 2 != 0 || dstHight % 2 != 0) {
+        LOGE("scale_down_yuv422: invalid width, height for scaling");
+        return -1;
+    }
+
+    step_x = srcWidth / dstWidth;
+    step_y = srcHight / dstHight;
+
+    dst_pos = 0;
+    for (uint32_t y = 0; y < dstHight; y++) {
+        src_y_start_pos = (y * step_y * (srcWidth * 2));
+
+        for (uint32_t x = 0; x < dstWidth; x += 2) {
+            src_pos = src_y_start_pos + (x * (step_x * 2));
+
+            dstBuf[dst_pos++] = srcBuf[src_pos    ];
+            dstBuf[dst_pos++] = srcBuf[src_pos + 1];
+            dstBuf[dst_pos++] = srcBuf[src_pos + 2];
+            dstBuf[dst_pos++] = srcBuf[src_pos + 3];
+        }
+    }
+
+    return 0;
 }
 
 }; // namespace android

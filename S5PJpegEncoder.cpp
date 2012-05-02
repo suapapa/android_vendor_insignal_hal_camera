@@ -15,17 +15,17 @@
  */
 
 //#define LOG_NDEBUG 0
-#define LOG_TAG "ExynosHWJpeg"
+#define LOG_TAG "S5PJpegEncoder"
 #include <utils/Log.h>
 
 #include <linux/videodev2.h>
 #include <videodev2_samsung.h>
 
-#include "ExynosHWJpeg.h"
+#include "S5PJpegEncoder.h"
 
 namespace android {
 
-ExynosHWJpeg::ExynosHWJpeg() :
+S5PJpegEncoder::S5PJpegEncoder() :
     _fd(0),
     _outBuff(NULL)
 {
@@ -35,7 +35,7 @@ ExynosHWJpeg::ExynosHWJpeg() :
     //_reset();
 }
 
-ExynosHWJpeg::~ExynosHWJpeg()
+S5PJpegEncoder::~S5PJpegEncoder()
 {
     if (_fd > 0) {
         LOGE_IF(api_jpeg_encode_deinit(_fd) != JPEG_OK,
@@ -45,7 +45,7 @@ ExynosHWJpeg::~ExynosHWJpeg()
     LOGV("%s: Deinited", __func__);
 }
 
-int ExynosHWJpeg::setImgFormat(int w, int h, int f)
+int S5PJpegEncoder::setImgFormat(int w, int h, int f, int q)
 {
     jpeg_stream_format sf = _getOutFormat(f);
 
@@ -62,12 +62,14 @@ int ExynosHWJpeg::setImgFormat(int w, int h, int f)
     _params.height = h;
     _params.in_fmt = YUV_422; // YCBCR only
     _params.out_fmt = _getOutFormat(f);
-    _params.quality = QUALITY_LEVEL_4;
+    _params.quality = _getQualityEnum(q);
+
+    LOGI("Set Params. image size=%dx%d, quality=%d", w, h, q);
 
     return 0;
 }
 
-int ExynosHWJpeg::doCompress(uint8_t* inBuff, int inBuffSize)
+int S5PJpegEncoder::doCompress(uint8_t* inBuff, int inBuffSize)
 {
     //_reset();
 
@@ -101,75 +103,54 @@ int ExynosHWJpeg::doCompress(uint8_t* inBuff, int inBuffSize)
         return -1;
     }
 
-    LOGI("JPEG compress done! jpeg size is %d", _params.size);
+    LOGI("JPEG encoded. imagesize=%dx%d datasize=%d",
+         _params.width, _params.height, _params.size);
 
     return _params.size;
 }
 
-int ExynosHWJpeg::copyOutput(uint8_t* outBuff, int outBuffSize)
+int S5PJpegEncoder::doCompress(EncoderParams* parm, uint8_t* inBuff, int inBuffSize)
 {
-    int jpegSize = _params.size;
+    setImgFormat(parm->width, parm->height, parm->format, parm->quality);
+    return doCompress(inBuff, inBuffSize);
+}
 
-    if (0 >= jpegSize) {
-        LOGE("%s: seems no jpeg image readied!", __func__);
+void S5PJpegEncoder::getOutput(uint8_t** jpegBuff, int* jpegSize)
+{
+    if (jpegBuff != NULL)
+        *jpegBuff = _outBuff;
+
+    if (jpegSize != NULL)
+        *jpegSize = _params.size;
+}
+
+int S5PJpegEncoder::copyOutput(uint8_t* outBuff, int outBuffSize, bool skipSOI)
+{
+    int outSize = _params.size - (skipSOI ? 2 : 0);
+
+    if (0 >= outSize) {
+        LOGE("%s: seem no output readied!", __func__);
         return -1;
     }
 
-    LOGW_IF(outBuffSize < jpegSize,
+    LOGW_IF(outBuffSize != outSize,
             "%s: outBuffsize(%d) and outSize(%d) not same!",
-            __func__, outBuffSize, jpegSize);
+            __func__, outBuffSize, outSize);
 
-    memcpy(outBuff, _outBuff, jpegSize);
+    int copySize = (outSize > outBuffSize) ? outBuffSize : outSize;
+    memcpy(outBuff, _outBuff + (skipSOI ? 2 : 0), copySize);
 
-    return jpegSize;
+    return copySize;
 }
 
-int ExynosHWJpeg::setQuality(int q)
+int S5PJpegEncoder::setQuality(int q)
 {
     _params.quality = _getQualityEnum(q);
 
     return 0;
 }
 
-int ExynosHWJpeg::setThumbSize(int w, int h)
-{
-    // TODO: no code here!
-
-    return 0;
-}
-
-int ExynosHWJpeg::setThumbQuality(int q)
-{
-    // TODO: no code here!
-
-    return 0;
-}
-
-int ExynosHWJpeg::setRotate(int r)
-{
-    // TODO: no exif code here!
-#if 0
-    _rotation = r;
-#endif
-
-    return 0;
-}
-
-int ExynosHWJpeg::setGps(double latitude, double longitude,
-                         unsigned int timestamp, short altitude)
-{
-    // TODO: no exif code here!
-#if 0
-    _gps_latitude  = latitude;
-    _gps_longitude = longitude;
-    _gps_timestamp = timestamp;
-    _gps_altitude  = altitude;
-#endif
-
-    return 0;
-}
-
-int ExynosHWJpeg::_reset(void)
+int S5PJpegEncoder::_reset(void)
 {
     int ret;
     if (_fd > 0) {
@@ -185,7 +166,7 @@ int ExynosHWJpeg::_reset(void)
     return _fd > 0 ? 0 : -1;
 }
 
-jpeg_stream_format ExynosHWJpeg::_getOutFormat(int inFmt)
+jpeg_stream_format S5PJpegEncoder::_getOutFormat(int inFmt)
 {
     jpeg_stream_format outFmt = JPEG_RESERVED;
 
@@ -204,7 +185,7 @@ jpeg_stream_format ExynosHWJpeg::_getOutFormat(int inFmt)
         break;
 
     defalut:
-        LOGE("%s: ExynosHWJpeg not support input format, %d", __func__, inFmt);
+        LOGE("%s: S5PJpegEncoder not support input format, %d", __func__, inFmt);
         break;
     }
 
@@ -213,7 +194,7 @@ jpeg_stream_format ExynosHWJpeg::_getOutFormat(int inFmt)
     return outFmt;
 }
 
-jpeg_img_quality_level ExynosHWJpeg::_getQualityEnum(int quality)
+jpeg_img_quality_level S5PJpegEncoder::_getQualityEnum(int quality)
 {
     jpeg_img_quality_level enumQuality = QUALITY_LEVEL_4;
 
@@ -226,6 +207,8 @@ jpeg_img_quality_level ExynosHWJpeg::_getQualityEnum(int quality)
         enumQuality = QUALITY_LEVEL_2;
     } else if (65 >= quality) {
         enumQuality = QUALITY_LEVEL_3;
+    } else {
+        enumQuality = QUALITY_LEVEL_4;
     }
 
     LOGV("%s: quality=%d, enumQuality=%d", __func__, quality, enumQuality);

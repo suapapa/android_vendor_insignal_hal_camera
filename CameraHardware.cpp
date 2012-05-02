@@ -556,14 +556,14 @@ status_t CameraHardware::cancelAutoFocus()
 
 bool CameraHardware::_pictureLoop()
 {
-    int ret = NO_ERROR;
-
     Mutex::Autolock lock(_pictureLock);
 
-    //_pictureLock.lock();
+    uint8_t* rawAddr = NULL;
+    int rawSize = 0;
+    int ret = NO_ERROR;
+
     _pictureState = PICTURE_CAPTURING;
     _pictureStateChangedCondition.broadcast();
-    //_pictureLock.unlock();
 
     LOGV("doing snapshot...");
     ret = _camera->startSnapshot();
@@ -578,12 +578,11 @@ bool CameraHardware::_pictureLoop()
 
     _camera->getSnapshot();
 
+    LOGV("getting raw snapshot...");
+    rawAddr = (uint8_t*)_rawHeap->data;
+    rawSize = _rawHeap->size;
+    _camera->getRawSnapshot(rawAddr, rawSize);
     if (_cbData && (_msgs & CAMERA_MSG_RAW_IMAGE)) {
-        LOGV("getting raw snapshot...");
-        uint8_t* rawAddr = (uint8_t*)_rawHeap->data;
-        int rawSize = _rawHeap->size;
-        _camera->getRawSnapshot(rawAddr, rawSize);
-
         _cbData(CAMERA_MSG_RAW_IMAGE, _rawHeap, 0, NULL, _cbCookie);
     } else if (_cbNotify && (_msgs & CAMERA_MSG_RAW_IMAGE_NOTIFY)) {
         _cbNotify(CAMERA_MSG_RAW_IMAGE_NOTIFY, 0, 0, _cbCookie);
@@ -594,35 +593,19 @@ bool CameraHardware::_pictureLoop()
 
     if (_cbData && (_msgs & CAMERA_MSG_COMPRESSED_IMAGE)) {
         // TODO: the heap size too enough for jpeg..
-        int jpegDataHeapSize = _camera->getSnapshotFrameSize();
-        camera_memory_t* jpegDataHeap = _cbReqMemory(-1, jpegDataHeapSize, 1, 0);
-        if (jpegDataHeap == NULL) {
+        int jpegSize = _camera->compress2Jpeg(rawAddr, rawSize);
+        camera_memory_t* jpegHeap = _cbReqMemory(-1, jpegSize, 1, 0);
+        if (jpegHeap == NULL) {
             LOGE("%s: Failed to get memory for jpegJeap!", __func__);
             return false;
         }
 
         LOGV("getting jpeg snapshot...");
-        int jpegDataSize = _camera->getJpegSnapshot((uint8_t*)jpegDataHeap->data,
-                           jpegDataHeapSize);
-
-        LOGV("copying meta datas...");
-        // TODO: add exif and thumbanil in jpeg
-        int jpegMetaSize = 0;
-
-
-        LOGV("joining jpeg meta and data...");
-        int jpegHeapSize = jpegMetaSize + jpegDataSize ;
-        camera_memory_t* jpegHeap = _cbReqMemory(-1, jpegHeapSize, 1, 0);
-        if (jpegHeap == NULL) {
-            LOGE("%s: Failed to get memory for jpegJeap!", __func__);
-            return false;
-        }
-        memcpy((uint8_t*)jpegHeap->data, jpegDataHeap->data, jpegDataSize);
+        int jpegDataSize = _camera->getJpeg((uint8_t*)jpegHeap->data,
+                           jpegSize);
 
         _cbData(CAMERA_MSG_COMPRESSED_IMAGE, jpegHeap, 0, NULL, _cbCookie);
 
-        jpegDataHeap->release(jpegDataHeap);
-        //jpegMetaHeap->release(jpegMetaHeap);
         jpegHeap->release(jpegHeap);
     }
 
@@ -786,14 +769,20 @@ status_t CameraHardware::setParameters(const CameraParameters& parms)
 
     // jpeg-thumbnail-quality
     strKey = CameraParameters::KEY_JPEG_THUMBNAIL_QUALITY;
-    // TODO: add code for thumbnail-quality
+    quality = parms.getInt(strKey);
+    if (_isParamUpdated(parms, strKey, quality)) {
+        LOGV("setting %s to %d...", strKey, quality);
+        err = _camera->setThumbQuality(quality);
+        if (!err)
+            _parms.set(strKey, quality);
+    }
 
     // jpeg-quality
     strKey = CameraParameters::KEY_JPEG_QUALITY;
     quality = parms.getInt(strKey);
     if (_isParamUpdated(parms, strKey, quality)) {
         LOGV("setting %s to %d...", strKey, quality);
-        err = _camera->setJpegQuality(quality);
+        err = _camera->setPictureQuality(quality);
         if (!err)
             _parms.set(strKey, quality);
     }

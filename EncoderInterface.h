@@ -14,25 +14,31 @@
  * limitations under the License.
  */
 
-#ifndef __ANDROID_HARDWARE_LIBCAMERA_JPEG_INTERFACE_H__
-#define __ANDROID_HARDWARE_LIBCAMERA_JPEG_INTERFACE_H__
+#ifndef __ANDROID_HARDWARE_LIBCAMERA_ENCODER_INTERFACE_H__
+#define __ANDROID_HARDWARE_LIBCAMERA_ENCODER_INTERFACE_H__
 
 namespace android {
 
-class JpegInterface {
+struct EncoderParams {
+    int width;
+    int height;
+    int format;
+    int quality;
+};
+
+class EncoderInterface {
 public:
-    virtual ~JpegInterface() { }
-    virtual int setImgFormat(int w, int h, int f) = 0;
+    virtual ~EncoderInterface() { }
+    virtual int setImgFormat(int w, int h, int f, int q = -1) = 0;
+
+    virtual int doCompress(EncoderParams* parm, uint8_t* inBuff, int inBuffSize) = 0;
     virtual int doCompress(uint8_t* inBuff, int inBuffSize) = 0;
-    virtual int copyOutput(uint8_t* outBuff, int outBuffSize) = 0;
+
+    virtual void getOutput(uint8_t** jpegBuff, int* jpegSize);
+    virtual int copyOutput(uint8_t* outBuff, int outBuffSize,
+                           bool skipSOI = false) = 0;
 
     virtual int setQuality(int q) = 0;
-    virtual int setThumbSize(int w, int h) = 0;
-    virtual int setThumbQuality(int q) = 0;
-
-    // For informastions of EXIF
-    virtual int setRotate(int r) = 0;
-    virtual int setGps(double lat, double lon, unsigned int ts, short alt) = 0;
 };
 
 }
