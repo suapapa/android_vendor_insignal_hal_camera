@@ -24,8 +24,7 @@
 #include <math.h>
 
 #include "SecCamera.h"
-#include "S5PJpegEncoder.h"
-//#include "ExifTagger.h"
+#include "CameraInfo.h"
 
 using namespace android;
 
@@ -70,8 +69,8 @@ SecCamera::SecCamera(const char* camPath, const char* recPath, int ch) :
 #ifdef DUAL_PORT_RECORDING
     _v4l2Rec = new SecV4L2Adapter(recPath, ch);
 #endif
-    _encoder = new S5PJpegEncoder();
-    //_tagger = new ExifTagger();
+    _encoder = get_encoder();
+    _tagger = get_tagger();
 
     if (_v4l2Cam->getFd() == 0 || _v4l2Rec->getFd() == 0) {
         _release();
@@ -694,17 +693,18 @@ int SecCamera::_createThumbnail(uint8_t* rawData, int rawSize)
     int tW = _thumbParams.width;
     int tH = _thumbParams.height;
 
+    if (_tagger == NULL || tW == 0 || tH == 0)
+        goto nothumbnail;
+
     LOGI("making thumb(%dx%d) from picture(%dx%d)...", tW, tH, pW, pH);
     if (rawSize != pW * pH * 2) {
         LOGE("%s: rawSize=%d, expected=%d", __func__, rawSize, pW * pH * 2);
         goto nothumbnail;
     }
 
-    if (tW > 0 && tH > 0) {
-        thumbRawSize = tW * tH * 2;
-        LOGV("making raw image for thumbnail(%dx%d)...", tW, tH);
-        thumbRawData = new uint8_t[thumbRawSize];
-    }
+    thumbRawSize = tW * tH * 2;
+    LOGV("making raw image for thumbnail(%dx%d)...", tW, tH);
+    thumbRawData = new uint8_t[thumbRawSize];
 
     if (thumbRawData && thumbRawSize) {
         LOGV("shrinking raw image for thumbnail...");

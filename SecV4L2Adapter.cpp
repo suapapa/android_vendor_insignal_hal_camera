@@ -347,8 +347,7 @@ SecV4L2Adapter::SecV4L2Adapter(const char* path, int ch) :
     _fd(0),
     _index(-1)
 {
-    LOGI("%s", __func__);
-
+    LOGV("opeing %s (ch=%d)...", path, ch);
     int err = 0;
     err |= _openCamera(path);
     err |= _setInputChann(ch);
@@ -365,7 +364,7 @@ SecV4L2Adapter::SecV4L2Adapter(const char* path, int ch) :
 
 SecV4L2Adapter::~SecV4L2Adapter()
 {
-    LOGI("%s", __func__);
+    LOGV("%s", __func__);
     if (_fd)
         close(_fd);
 }
@@ -454,8 +453,8 @@ int SecV4L2Adapter::setFmt(int w, int h, unsigned int fmt, int flag)
     int found = 0;
     while (ioctl(_fd, VIDIOC_ENUM_FMT, &fmtdesc) == 0) {
         if (fmtdesc.pixelformat == fmt) {
-            LOGI("passed fmt = %d found pixel format[%d]: %s\n",
-                 fmt, fmtdesc.index, fmtdesc.description);
+            LOGI("passed fmt = %s found pixel format[%d]: %s\n",
+                 getStrFourCC(fmt), fmtdesc.index, fmtdesc.description);
             found = 1;
             break;
         }

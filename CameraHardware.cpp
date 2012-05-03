@@ -256,6 +256,7 @@ status_t CameraHardware::_fillWindow(const char* previewFrame,
 bool CameraHardware::_previewLoop()
 {
     _previewLock.lock();
+
     switch (_previewState) {
     case PREVIEW_RUNNING:
     case PREVIEW_RECORDING:
@@ -287,13 +288,16 @@ bool CameraHardware::_previewLoop()
         LOGW("Is preview frame not readied?");
         return true;
     }
+
     nsecs_t timestamp = systemTime(SYSTEM_TIME_MONOTONIC);
 
-    int w, h, frameSize;
-    _camera->getPreviewFrameSize(&w, &h, &frameSize);
-    int offset =  frameSize * index;
-    const char* preview_format = _parms.getPreviewFormat();
-    _fillWindow(((const char*)_previewHeap->data) + offset, w, h, preview_format);
+    if (_window) {
+        int w, h, frameSize;
+        _camera->getPreviewFrameSize(&w, &h, &frameSize);
+        int offset =  frameSize * index;
+        const char* preview_format = _parms.getPreviewFormat();
+        _fillWindow(((const char*)_previewHeap->data) + offset, w, h, preview_format);
+    }
 
     // Notify the client of a new frame.
     if (_cbData && (_msgs & CAMERA_MSG_PREVIEW_FRAME)) {
@@ -304,9 +308,9 @@ bool CameraHardware::_previewLoop()
     if (_previewState == PREVIEW_RECORDING) {
         unsigned int phyYAddr, phyCAddr;
         int ret = _camera->getRecordBuffer(&index, &phyYAddr, &phyCAddr);
-        if (0 > ret) {
-            LOGE("%s: Failed to get PhyAddr for Record!", __func__);
-            return false;
+        if (0 > ret || 0 > index) {
+            LOGW("Is record frame not readied?");
+            return true;
         }
 
         struct ADDRS* addrs     = (struct ADDRS*)_recordHeap->data;
@@ -432,7 +436,6 @@ status_t CameraHardware::startRecording()
 
     if (_recordHeap)
         _recordHeap->release(_recordHeap);
-
     _recordHeap = _cbReqMemory(-1, sizeof(struct ADDRS), MAX_CAM_BUFFERS, NULL);
     if (_recordHeap == NULL) {
         LOGE("ERR(%s): Record heap creation fail", __func__);
@@ -542,9 +545,10 @@ status_t CameraHardware::cancelAutoFocus()
 {
     Mutex::Autolock lock(_focusLock);
 
-    LOGI("%s: AF canceling... current state is %d",
-         __func__, _focusState);
+    if (_focusState == FOCUS_IDLE)
+        return NO_ERROR;
 
+    LOGI("AF canceling... current state is %d", _focusState);
     if (_camera->abortAutoFocus() < 0) {
         LOGE("ERR(%s):Fail on _camera->cancelAutofocus()", __func__);
         return UNKNOWN_ERROR;
@@ -601,11 +605,8 @@ bool CameraHardware::_pictureLoop()
         }
 
         LOGV("getting jpeg snapshot...");
-        int jpegDataSize = _camera->getJpeg((uint8_t*)jpegHeap->data,
-                           jpegSize);
-
+        _camera->getJpeg((uint8_t*)jpegHeap->data, jpegSize);
         _cbData(CAMERA_MSG_COMPRESSED_IMAGE, jpegHeap, 0, NULL, _cbCookie);
-
         jpegHeap->release(jpegHeap);
     }
 

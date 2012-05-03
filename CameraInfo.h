@@ -4,12 +4,18 @@
 #include <string.h>
 #include <hardware/camera.h>
 
-namespace android {
+#include "EncoderInterface.h"
+#include "TaggerInterface.h"
 
-const char* camera_info_get_default_camera_param_str(int camera_id);
+namespace android {
 
 int camera_info_get_number_of_cameras(void);
 int camera_info_get_camera_info(int camera_id, struct camera_info* info);
+
+const char* camera_info_get_default_camera_param_str(int camera_id);
+
+EncoderInterface*	get_encoder(void);
+TaggerInterface*	get_tagger(void);
 
 };
 

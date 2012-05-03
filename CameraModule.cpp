@@ -63,6 +63,8 @@ extern "C" {
             name          : "Insignal Camera HAL",
             author        : "Homin Lee <suapapa@insignal.co.kr>",
             methods       : &camera_module_methods,
+            dso           : NULL,
+            reserved      : {0},
         },
         get_number_of_cameras : camera_info_get_number_of_cameras,
         get_camera_info       : camera_info_get_camera_info,
