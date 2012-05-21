@@ -4,7 +4,9 @@
 
 #include "CameraInfo.h"
 
+#ifdef SAMSUNG_S5P_JPEG_ENCODER
 #include "S5PJpegEncoder.h"
+#endif
 //#include "ExifTagger.h"
 
 namespace android {
@@ -68,8 +70,15 @@ int camera_info_get_camera_info(int camera_id, struct camera_info* info)
 
 EncoderInterface* get_encoder(void)
 {
+    EncoderInterface* encoder = NULL;
+
+#ifdef SAMSUNG_S5P_JPEG_ENCODER
     LOGI("creating S5PJpegEncoder...");
     EncoderInterface* encoder = new S5PJpegEncoder();
+#endif
+
+    LOGW_IF(encoder == NULL, "No jpeg encoder specified!");
+
     return encoder;
 }
 

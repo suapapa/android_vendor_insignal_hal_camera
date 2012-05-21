@@ -27,12 +27,15 @@ LOCAL_SHARED_LIBRARIES += libhardware libcamera_client
 LOCAL_C_INCLUDES += external/libyuv/files/include
 LOCAL_STATIC_LIBRARIES += libyuv_static
 
-#ifeq ($(BOARD_USE_JPEG),true)
+ifeq ($(TARGET_SOC),exynos4210)
+ifeq ($(BOARD_USE_JPEG),true)
+LOCAL_CFALGS += SAMSUNG_S5P_JPEG_ENCODER
 LOCAL_SRC_FILES += \
 	S5PJpegEncoder.cpp
 
 LOCAL_SHARED_LIBRARIES += libs5pjpeg
-#endif
+endif
+endif
 
 LOCAL_MODULE_TAGS := optional
 LOCAL_MODULE_PATH := $(TARGET_OUT_SHARED_LIBRARIES)/hw
