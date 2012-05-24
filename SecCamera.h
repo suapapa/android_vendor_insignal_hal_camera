@@ -60,7 +60,6 @@ public:
     void                getPreviewFrameSize(int* width, int* height, int* frameSize);
 
     int                 setSnapshotFormat(int width, int height, const char* strPixfmt);
-    unsigned int        getSnapshotFrameSize(void);
 
     int                 startAutoFocus(void);
     int                 abortAutoFocus(void);
@@ -81,13 +80,13 @@ public:
     int                 setThumbQuality(int q);
     int                 setJpegThumbnailSize(int width, int height);
 
-    int                 startSnapshot(void);
+    int                 startSnapshot(size_t* captureSize);
     int                 getSnapshot(int xth = 0);
-    int                 getRawSnapshot(uint8_t* buffer, unsigned int size);
-    int                 getJpegSnapshot(uint8_t* buffer, unsigned int size);
+    int                 getRawSnapshot(uint8_t* buffer, size_t size);
+    int                 getJpegSnapshot(uint8_t* buffer, size_t size);
     int                 endSnapshot(void);
 
-    int                 compress2Jpeg(unsigned char* rawData, int rawSize);
+    int                 compress2Jpeg(unsigned char* rawData, size_t rawSize);
     int                 getJpeg(unsigned char* outBuff, int buffSize);
 
     int                 setGpsInfo(const char* strLatitude,
@@ -114,7 +113,6 @@ private:
     int                 _snapshotWidth;
     int                 _snapshotHeight;
     int                 _snapshotPixfmt;
-    unsigned int        _snapshotFrameSize;
 
     bool                _isPreviewOn;
 

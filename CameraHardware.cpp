@@ -75,6 +75,7 @@ CameraHardware::CameraHardware(int cameraId)
 
     _cameraId = cameraId;
     _initParams();
+    setParameters(_parms, true);
 
     _previewState = PREVIEW_IDLE;
     _previewThread = new PreviewThread(this);
@@ -563,14 +564,14 @@ bool CameraHardware::_pictureLoop()
     Mutex::Autolock lock(_pictureLock);
 
     uint8_t* rawAddr = NULL;
-    int rawSize = 0;
+    size_t rawSize = 0;
     int ret = NO_ERROR;
 
     _pictureState = PICTURE_CAPTURING;
     _pictureStateChangedCondition.broadcast();
 
     LOGV("doing snapshot...");
-    ret = _camera->startSnapshot();
+    ret = _camera->startSnapshot(&rawSize);
     if (ret != 0) {
         LOGE("%s: Failed to do snapshot!", __func__);
         ret = UNKNOWN_ERROR;
@@ -582,10 +583,23 @@ bool CameraHardware::_pictureLoop()
 
     _camera->getSnapshot();
 
+    if (_rawHeap == NULL || _rawHeap->size != rawSize) {
+        LOGV("allocating mem (%d bytes) for raw snapshot...", rawSize);
+        if (_rawHeap != NULL)
+            _rawHeap->release(_rawHeap);
+
+        _rawHeap = _cbReqMemory(-1, rawSize, 1, 0);
+        if (_rawHeap == NULL) {
+            LOGE("%s: Failed to create RawHeap!", __func__);
+            ret = NO_MEMORY;
+            goto out;
+        }
+    }
+
     LOGV("getting raw snapshot...");
     rawAddr = (uint8_t*)_rawHeap->data;
-    rawSize = _rawHeap->size;
     _camera->getRawSnapshot(rawAddr, rawSize);
+
     if (_cbData && (_msgs & CAMERA_MSG_RAW_IMAGE)) {
         _cbData(CAMERA_MSG_RAW_IMAGE, _rawHeap, 0, NULL, _cbCookie);
     } else if (_cbNotify && (_msgs & CAMERA_MSG_RAW_IMAGE_NOTIFY)) {
@@ -700,7 +714,7 @@ bool CameraHardware::_isParamUpdated(const CameraParameters& newParams,
     return false;
 }
 
-status_t CameraHardware::setParameters(const CameraParameters& parms)
+status_t CameraHardware::setParameters(const CameraParameters& parms, bool needInit)
 {
     status_t ret = NO_ERROR;
     const char* strKey;
@@ -713,7 +727,7 @@ status_t CameraHardware::setParameters(const CameraParameters& parms)
      * up the sensor quite a bit so return error.  we can't wait because
      * that would cause deadlock with the callbacks
      */
-    if (_waitPictureComplete() != NO_ERROR) {
+    if (!needInit && _waitPictureComplete() != NO_ERROR) {
         LOGE("%s: Too long wait for capture finish!", __func__);
         return TIMED_OUT;
     }
@@ -721,12 +735,13 @@ status_t CameraHardware::setParameters(const CameraParameters& parms)
     // preview-size and preview-format
     strSize = parms.get(CameraParameters::KEY_PREVIEW_SIZE);
     strPixfmt = parms.get(CameraParameters::KEY_PREVIEW_FORMAT);
-    if (_isParamUpdated(parms, CameraParameters::KEY_PREVIEW_SIZE, strSize)
+    if (needInit
+            || _isParamUpdated(parms, CameraParameters::KEY_PREVIEW_SIZE, strSize)
             || _isParamUpdated(parms, CameraParameters::KEY_PREVIEW_FORMAT, strPixfmt)) {
         parms.getPreviewSize(&width, &height);
         LOGV("setting preview format to %dx%d(%s)...", width, height, strPixfmt);
         err = _camera->setPreviewFormat(width, height, strPixfmt);
-        if (!err) {
+        if (!needInit && !err) {
             _parms.setPreviewSize(width, height);
             _parms.setPreviewFormat(strPixfmt);
         }
@@ -735,21 +750,13 @@ status_t CameraHardware::setParameters(const CameraParameters& parms)
     // picture-size and picture-format
     strSize = parms.get(CameraParameters::KEY_PICTURE_SIZE);
     strPixfmt = parms.get(CameraParameters::KEY_PICTURE_FORMAT);
-    if (_isParamUpdated(parms, CameraParameters::KEY_PICTURE_SIZE, strSize)
+    if (needInit
+            || _isParamUpdated(parms, CameraParameters::KEY_PICTURE_SIZE, strSize)
             || _isParamUpdated(parms, CameraParameters::KEY_PICTURE_FORMAT, strPixfmt)) {
         parms.getPictureSize(&width, &height);
-        LOGV("setting picture format to %dx%d(%s)...", width, height, strPixfmt);
+        LOGV("#### setting picture format to %dx%d(%s)...", width, height, strPixfmt);
         err = _camera->setSnapshotFormat(width, height, strPixfmt);
-        if (!err) {
-            int rawHeapSize = _camera->getSnapshotFrameSize();
-            if (_rawHeap != NULL)
-                _rawHeap->release(_rawHeap);
-
-            _rawHeap = _cbReqMemory(-1, rawHeapSize, 1, 0);
-            if (_rawHeap == NULL) {
-                LOGE("%s: Failed to create RawHeap!", __func__);
-                return NO_MEMORY;
-            }
+        if (!needInit && !err) {
             _parms.setPictureSize(width, height);
             _parms.setPictureFormat(strPixfmt);
         }

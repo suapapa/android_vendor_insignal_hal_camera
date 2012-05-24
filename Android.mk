@@ -28,13 +28,11 @@ LOCAL_C_INCLUDES += external/libyuv/files/include
 LOCAL_STATIC_LIBRARIES += libyuv_static
 
 ifeq ($(TARGET_SOC),exynos4210)
-ifeq ($(BOARD_USE_JPEG),true)
-LOCAL_CFALGS += SAMSUNG_S5P_JPEG_ENCODER
+LOCAL_CFLAGS += -DSAMSUNG_S5P_JPEG_ENCODER
 LOCAL_SRC_FILES += \
 	S5PJpegEncoder.cpp
 
 LOCAL_SHARED_LIBRARIES += libs5pjpeg
-endif
 endif
 
 LOCAL_MODULE_TAGS := optional

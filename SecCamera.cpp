@@ -55,7 +55,6 @@ SecCamera::SecCamera(const char* camPath, const char* recPath, int ch) :
     _snapshotWidth(0),
     _snapshotHeight(0),
     _snapshotPixfmt(-1),
-    _snapshotFrameSize(0),
     _isPreviewOn(false),
     _isRecordOn(false),
     _v4l2Cam(NULL),
@@ -368,7 +367,7 @@ int SecCamera::endSnapshot(void)
     return _v4l2Cam->closeBufs(&_captureBuf, 1);
 }
 
-int SecCamera::startSnapshot(void)
+int SecCamera::startSnapshot(size_t* captureSize)
 {
     LOG_TIME_START(0);
     stopPreview();
@@ -388,13 +387,14 @@ int SecCamera::startSnapshot(void)
     LOG_CAMERA("%s: stopPreview(%lu), prepare(%lu) us",
                __func__, LOG_TIME(0), LOG_TIME(1));
 
+    *captureSize = _captureBuf.length;
+
     return 0;
 }
 // ------------------------------------------------------------------
 
 int SecCamera::getSnapshot(int xth)
 {
-
     int index;
     int skipFirstNFrames = xth;
 
@@ -421,7 +421,7 @@ int SecCamera::getSnapshot(int xth)
     return 0;
 }
 
-int SecCamera::getRawSnapshot(uint8_t* buffer, unsigned int size)
+int SecCamera::getRawSnapshot(uint8_t* buffer, size_t size)
 {
     if (buffer == NULL) {
         LOGE("%s: got null pointer!", __func__);
@@ -446,11 +446,6 @@ int SecCamera::setSnapshotFormat(int width, int height, const char* strPixfmt)
     _snapshotHeight = height;
     _snapshotPixfmt = _v4l2Cam->nPixfmt(strPixfmt);
 
-    /* TODO: send snapshot format to dirver which have context change */
-
-    _snapshotFrameSize = _v4l2Cam->frameSize(_snapshotWidth, _snapshotHeight,
-                         _snapshotPixfmt);
-
     _pictureParams.width = _snapshotWidth;
     _pictureParams.height = _snapshotHeight;
     _pictureParams.format = _snapshotPixfmt;
@@ -459,18 +454,12 @@ int SecCamera::setSnapshotFormat(int width, int height, const char* strPixfmt)
     // So, same image format is used
     _thumbParams.format = _snapshotPixfmt;
 
-    LOGI("snapshotFormat=%dx%d(%s), frameSize=%d",
-         width, height, strPixfmt, _snapshotFrameSize);
+    LOGI("snapshotFormat=%dx%d(%s)", width, height, strPixfmt);
 
     _exifParams.width = _snapshotWidth;
     _exifParams.height = _snapshotHeight;
 
-    return _snapshotFrameSize > 0 ? 0 : -1;
-}
-
-unsigned int SecCamera::getSnapshotFrameSize(void)
-{
-    return _snapshotFrameSize;
+    return 0;
 }
 
 // ======================================================================
@@ -503,7 +492,7 @@ bool SecCamera::getAutoFocusResult(void)
     bool afDone = false;
 // TODO: get result of AF is 2 step,
 // V4L2_CID_CAMERA_AUTO_FOCUS_RESULT_FIRST and V4L2_CID_CAMERA_AUTO_FOCUS_RESULT_SECOND
-#if 0 
+#if 0
     int ret = _v4l2Cam->getCtrl(V4L2_CID_CAMERA_AUTO_FOCUS_RESULT);
     switch (ret) {
     case 0x01:
@@ -748,8 +737,18 @@ nothumbnail:
     return -1;
 }
 
-int SecCamera::compress2Jpeg(unsigned char* rawData, int rawSize)
+int SecCamera::compress2Jpeg(unsigned char* rawData, size_t rawSize)
 {
+    if (rawData == NULL || rawSize == 0) {
+        LOGE("%s: null input!", __func__);
+        return 0;
+    }
+
+    if (_encoder == NULL) {
+        LOGE("%s: has no encoder!", __func__);
+        return 0;
+    }
+
     int ret = 0;
 
     _createThumbnail(rawData, rawSize);
@@ -765,7 +764,7 @@ int SecCamera::compress2Jpeg(unsigned char* rawData, int rawSize)
 
     if (_tagger == NULL) {
         LOGW("No tagger! jpeg will be served without tag");
-	return jpegSize;
+        return jpegSize;
     }
 
     LOGI("creating tagged JPEG...");
@@ -779,6 +778,11 @@ int SecCamera::compress2Jpeg(unsigned char* rawData, int rawSize)
 
 int SecCamera::getJpeg(unsigned char* outBuff, int buffSize)
 {
+    if (_encoder == NULL) {
+        LOGE("%s: has no encoder!", __func__);
+        return 0;
+    }
+
     int writtenSize = 0;
 
     if (_tagger) {

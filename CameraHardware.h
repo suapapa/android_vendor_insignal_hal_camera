@@ -56,7 +56,7 @@ public:
     status_t    takePicture();
     status_t    cancelPicture();
 
-    status_t    setParameters(const CameraParameters& parms);
+    status_t    setParameters(const CameraParameters& parms, bool needInit = false);
     CameraParameters  getParameters() const;
     status_t    sendCommand(int32_t command, int32_t arg1, int32_t arg2);
     int         getCameraId(void) const;
