@@ -7,6 +7,10 @@
 #ifdef SAMSUNG_S5P_JPEG_ENCODER
 #include "S5PJpegEncoder.h"
 #endif
+
+#ifdef LIBJPEG_ENCODER
+#include "LibJpegEncoder.h"
+#endif
 //#include "ExifTagger.h"
 
 namespace android {
@@ -79,9 +83,14 @@ EncoderInterface* get_encoder(void)
 {
     EncoderInterface* encoder = NULL;
 
-#ifdef SAMSUNG_S5P_JPEG_ENCODER
+#if 0 //def SAMSUNG_S5P_JPEG_ENCODER
     LOGI("creating S5PJpegEncoder...");
     encoder = new S5PJpegEncoder();
+#endif
+
+#ifdef LIBJPEG_ENCODER
+    LOGI("creating LibJpegEncoder...");
+    encoder = new LibJpegEncoder();
 #endif
 
     LOGW_IF(encoder == NULL, "No jpeg encoder specified!");
