@@ -26,16 +26,9 @@ const char* camera_info_get_default_camera_param_str(int camera_id)
         "preview-frame-rate-values=7,15,30;"
         "preview-fps-range=15000,30000;"
         "preview-fps-range-values=(15000,30000);"
-// TODO: 5MP is too much for raw-snapshot! It needs 10M bytes. dirty fix here not to capture too large
-#if 0
         "picture-size=2560x1920;"
         "picture-size-values=3264x2448,3264x1968,"
         "2560x1920,2048x1536,2048x1536,2048x1232,"
-        "1600x1200,1600x960,"
-        "800x480,640x480;"
-#endif
-        "picture-size=1600x1200;"
-        "picture-size-values="
         "1600x1200,1600x960,"
         "800x480,640x480;"
         "picture-format=jpeg;"
