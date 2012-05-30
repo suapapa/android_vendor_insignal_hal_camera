@@ -121,7 +121,7 @@ int LibJpegEncoder::doCompress(EncoderParams* params, uint8_t* inBuff, int inBuf
     if (!_checkParamsValid(params))
         return 0;
 
-    LOGI("encoding %dx%d with %d...\%",
+    LOGI("encoding %dx%d with q%d...",
          params->width, params->height, params->quality);
 
     LOGV("preparing buffer...");

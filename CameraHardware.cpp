@@ -25,7 +25,7 @@
 #include <ui/GraphicBufferMapper.h>
 #include <media/stagefright/MetadataBufferType.h>
 
-#include "CameraInfo.h"
+#include "CameraFactory.h"
 #include "CameraHardware.h"
 
 namespace android {
@@ -62,7 +62,7 @@ CameraHardware::CameraHardware(int cameraId)
 {
     LOGV("%s :", __func__);
 
-    // TODO : get path and ch-idx from CameraInfo
+    // TODO : get path and ch-idx from CameraFactory
     const char* camPath = CAMERA_DEV_NAME;
     const char* recPath = CAMERA_DEV_NAME2;
     _camera = new SecCamera(camPath, recPath, cameraId);

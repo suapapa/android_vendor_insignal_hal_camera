@@ -1,8 +1,8 @@
 //#define LOG_NDEBUG 0
-#define LOG_TAG "CameraInfo"
+#define LOG_TAG "CameraFactory"
 #include <utils/Log.h>
 
-#include "CameraInfo.h"
+#include "CameraFactory.h"
 
 #ifdef SAMSUNG_S5P_JPEG_ENCODER
 #include "S5PJpegEncoder.h"

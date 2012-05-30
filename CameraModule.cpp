@@ -22,7 +22,7 @@
 #include <stdlib.h>
 #include <hardware/camera.h>
 
-#include "CameraInfo.h"
+#include "CameraFactory.h"
 #include "CameraDevice.h"
 
 namespace android {

@@ -24,7 +24,7 @@
 #include <math.h>
 
 #include "SecCamera.h"
-#include "CameraInfo.h"
+#include "CameraFactory.h"
 
 using namespace android;
 

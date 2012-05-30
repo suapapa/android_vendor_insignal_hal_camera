@@ -7,7 +7,7 @@ include $(CLEAR_VARS)
 # Camera Info for Origenboard
 # TODO: Fix it cat to select custom info
 LOCAL_SRC_FILES += \
-	CameraInfo.cpp
+	CameraFactory.cpp
 
 LOCAL_SRC_FILES += \
 	SecCamera.cpp \
