@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef __LIBCAMERA_EXIF_TAGGER_H__
-#define __LIBCAMERA_EXIF_TAGGER_H__
+#ifndef __LIBCAMERA_GNUEXIF_TAGGER_H__
+#define __LIBCAMERA_GNUEXIF_TAGGER_H__
 
 #include <libexif/exif-data.h>
 #include <libjpeg/jpeg-data.h>
@@ -24,10 +24,10 @@
 
 namespace android {
 
-class ExifTagger : public TaggerInterface {
+class GnuExifTagger : public TaggerInterface {
 public:
-    ExifTagger();
-    ~ExifTagger();
+    GnuExifTagger();
+    ~GnuExifTagger();
     virtual int createTaggedJpeg(TaggerParams* p,
                                  const uint8_t* jpegData,
                                  unsigned int jpegSize);

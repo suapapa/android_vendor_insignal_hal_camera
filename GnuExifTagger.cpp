@@ -15,7 +15,7 @@
  */
 
 //#define LOG_NDEBUG 0
-#define LOG_TAG "ExifTagger"
+#define LOG_TAG "GnuExifTagger"
 #include <utils/Log.h>
 
 #include <stdlib.h>
@@ -27,7 +27,7 @@
 #include <libexif/exif-ifd.h>
 #include <libexif/exif-loader.h>
 
-#include "ExifTagger.h"
+#include "GnuExifTagger.h"
 
 namespace android {
 
@@ -66,7 +66,7 @@ static void exif_entry_set_gps_version(ExifData* pEdata, ExifIfd eEifd, ExifTag 
 static const char ExifAsciiPrefix[] = { 0x41, 0x53, 0x43, 0x49, 0x49, 0x0, 0x0, 0x0 };
 
 
-ExifTagger::ExifTagger() :
+GnuExifTagger::GnuExifTagger() :
     _exif(NULL),
     _jpeg(NULL),
     _taggedJpegBuff(NULL),
@@ -75,7 +75,7 @@ ExifTagger::ExifTagger() :
     LOGV("%s", __func__);
 }
 
-ExifTagger::~ExifTagger()
+GnuExifTagger::~GnuExifTagger()
 {
     LOGV("%s", __func__);
 
@@ -85,7 +85,7 @@ ExifTagger::~ExifTagger()
         free(_taggedJpegBuff);
 }
 
-int ExifTagger::createTaggedJpeg(TaggerParams* p,
+int GnuExifTagger::createTaggedJpeg(TaggerParams* p,
                                  const uint8_t* jpegData,
                                  unsigned int jpegSize)
 {
@@ -123,7 +123,7 @@ int ExifTagger::createTaggedJpeg(TaggerParams* p,
     return _taggedJpegSize;
 }
 
-int ExifTagger::copyJpegWithExif(uint8_t* targetBuff,
+int GnuExifTagger::copyJpegWithExif(uint8_t* targetBuff,
                                  int targetBuffSize)
 {
     if (targetBuffSize < _taggedJpegSize) {
@@ -141,7 +141,7 @@ int ExifTagger::copyJpegWithExif(uint8_t* targetBuff,
     return writtenSize;
 }
 
-int ExifTagger::_buildExifData(TaggerParams* par)
+int GnuExifTagger::_buildExifData(TaggerParams* par)
 {
     struct tm* sTime;
     char* TimeStr = NULL;

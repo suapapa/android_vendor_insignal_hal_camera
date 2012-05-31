@@ -27,7 +27,7 @@
 #ifdef LIBJPEG_ENCODER
 #include "LibJpegEncoder.h"
 #endif
-//#include "ExifTagger.h"
+//#include "GnuExifTagger.h"
 
 namespace android {
 
@@ -110,7 +110,7 @@ EncoderInterface* get_encoder(void)
 TaggerInterface* get_tagger(void)
 {
     LOGW("No tagger exists!");
-    TaggerInterface* tagger = NULL; //new ExifTagger();
+    TaggerInterface* tagger = NULL; //new GnuExifTagger();
     return tagger;
 }
 
