@@ -33,10 +33,17 @@ LOCAL_SRC_FILES += S5PJpegEncoder.cpp
 LOCAL_SHARED_LIBRARIES += libs5pjpeg
 endif
 
+# Software encoder
 LOCAL_CFLAGS += -DLIBJPEG_ENCODER
 LOCAL_SRC_FILES += LibJpegEncoder.cpp
 LOCAL_SHARED_LIBRARIES += libjpeg
 LOCAL_C_INCLUDES += external/jpeg
+
+# ExifTagger
+LOCAL_SRC_FILES += ExifTagger.cpp
+LOCAL_SHARED_LIBRARIES += libexif
+LOCAL_C_INCLUDES += external/jhead
+
 
 LOCAL_MODULE_TAGS := optional
 LOCAL_MODULE_PATH := $(TARGET_OUT_SHARED_LIBRARIES)/hw
