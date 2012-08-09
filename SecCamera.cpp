@@ -25,27 +25,13 @@
 #include "SecCamera.h"
 #include "CameraFactory.h"
 
+#define CAMERA_DEV_NAME         "/dev/video0"
+
 using namespace android;
 
 namespace android {
 
-// ======================================================================
-// Camera controls
-void SecCamera::releaseRecordFrame(int i)
-{
-    LOGV("releaseframe : (%d)", i);
-
-#ifdef DUAL_PORT_RECORDING
-    int ret = _v4l2Rec->qbuf(i);
-    //CHECK(ret == 0);
-#endif
-
-}
-
-// ======================================================================
-// Constructor & Destructor
-
-SecCamera::SecCamera(const char* camPath, const char* recPath, int ch) :
+SecCamera::SecCamera(int ch) :
     _isInited(false),
     _previewWidth(0),
     _previewHeight(0),
@@ -61,16 +47,13 @@ SecCamera::SecCamera(const char* camPath, const char* recPath, int ch) :
     _encoder(NULL),
     _tagger(NULL)
 {
-    LOGV("%s()", __func__);
+    LOGI("%s()", __func__);
 
-    _v4l2Cam = new SecV4L2Adapter(camPath, ch);
-#ifdef DUAL_PORT_RECORDING
-    _v4l2Rec = new SecV4L2Adapter(recPath, ch);
-#endif
+    _v4l2Cam = new SecV4L2Adapter(CAMERA_DEV_NAME, ch);
     _encoder = get_encoder();
     _tagger = get_tagger();
 
-    if (_v4l2Cam->getFd() == 0 || _v4l2Rec->getFd() == 0) {
+    if (_v4l2Cam->getFd() == 0) {
         _release();
         LOGE("!! %s: Failed to create SecCamera !!", __func__);
         return;
@@ -83,7 +66,7 @@ SecCamera::SecCamera(const char* camPath, const char* recPath, int ch) :
 
 SecCamera::~SecCamera()
 {
-    LOGV("%s()", __func__);
+    LOGI("%s()", __func__);
 
     if (!_isInited) {
         LOGV("%s: Can't destroy! SecCamera not inited!", __func__);
@@ -93,10 +76,7 @@ SecCamera::~SecCamera()
     LOGE_IF(this->stopPreview() < 0,
             "ERR(%s):Fail on stopPreview()\n", __func__);
 
-#ifdef DUAL_PORT_RECORDING
     stopRecord();
-#endif
-
     _release();
 
     _isInited = false;
@@ -115,11 +95,8 @@ void SecCamera::_release(void)
     if (_v4l2Cam)
         delete _v4l2Cam;
 
-#ifdef DUAL_PORT_RECORDING
     if (_v4l2Rec)
         delete _v4l2Rec;
-#endif
-
 }
 
 int SecCamera::flagCreate(void) const
@@ -146,23 +123,13 @@ int SecCamera::startPreview(void)
     }
 
     int ret = 0;
-
-    ret = _v4l2Cam->setFmt(_previewWidth, _previewHeight, _previewPixfmt, 0);
-    CHECK_EQ(ret, 0);
-
-    _v4l2Cam->initBufs(_previewBufs, _previewWidth, _previewHeight,
-                       _previewPixfmt, MAX_CAM_BUFFERS);
-    ret = _v4l2Cam->reqBufs(V4L2_BUF_TYPE_VIDEO_CAPTURE, MAX_CAM_BUFFERS);
-    CHECK_EQ(ret, MAX_CAM_BUFFERS);
-
-    ret = _v4l2Cam->queryBufs(_previewBufs, V4L2_BUF_TYPE_VIDEO_CAPTURE, MAX_CAM_BUFFERS);
-    CHECK_EQ(ret, 0);
+    ret = _v4l2Cam->setupBufs(_previewWidth, _previewHeight, _previewPixfmt,
+                              MAX_CAM_BUFFERS, 0);
+    CHECK(ret > 0);
 
     /* start with all buffers in queue */
-    for (int i = 0; i < MAX_CAM_BUFFERS; i++) {
-        ret = _v4l2Cam->qbuf(i);
-        CHECK_EQ(ret, 0);
-    }
+    ret = _v4l2Cam->qAllBufs();
+    CHECK_EQ(ret, 0);
 
     ret = _v4l2Cam->startStream(true);
     CHECK_EQ(ret, 0);
@@ -175,8 +142,9 @@ int SecCamera::startPreview(void)
     ret = _v4l2Cam->waitFrame();
     CHECK_EQ(ret, 0);
 
-    int index = _v4l2Cam->dqbuf();
-    ret = _v4l2Cam->qbuf(index);
+    // discard first frame
+    int index = _v4l2Cam->dqBuf();
+    ret = _v4l2Cam->qBuf(index);
     CHECK_EQ(ret, 0);
 
     return 0;
@@ -192,17 +160,17 @@ int SecCamera::stopPreview(void)
     int ret = _v4l2Cam->startStream(false);
     CHECK(ret == 0);
 
-    _v4l2Cam->closeBufs(_previewBufs, MAX_CAM_BUFFERS);
-    _isPreviewOn = false; //Kamat check
+    _v4l2Cam->closeBufs();
+    _isPreviewOn = false;
 
     return 0;
 }
 
-//Recording
 #ifdef DUAL_PORT_RECORDING
+#define CAMERA_DEV_NAME2        "/dev/video2"
+//Recording
 int SecCamera::startRecord(void)
 {
-    LOGI("++%s() \n", __func__);
     int ret = 0;
     // aleady started
     if (_isRecordOn == true) {
@@ -210,24 +178,22 @@ int SecCamera::startRecord(void)
         return 0;
     }
 
-    int color_format = V4L2_PIX_FMT_NV12;
+    if (_v4l2Rec == NULL) {
+        _v4l2Rec = new SecV4L2Adapter(CAMERA_DEV_NAME2, _v4l2Cam->getChIdx());
+        if (_v4l2Rec->getFd() == 0) {
+            LOGE("failed to open rec video ch");
+            return -1;
+        }
+    }
 
-    ret = _v4l2Rec->setFmt(_previewWidth, _previewHeight, color_format, 0);
-    CHECK(ret == 0);
-
-    _v4l2Cam->initBufs(_recordBufs, _previewWidth, _previewHeight,
-                       _previewPixfmt, MAX_CAM_BUFFERS);
-    ret = _v4l2Rec->reqBufs(V4L2_BUF_TYPE_VIDEO_CAPTURE, MAX_CAM_BUFFERS);
-    CHECK_EQ(ret, MAX_CAM_BUFFERS);
-
-    ret = _v4l2Rec->queryBufs(_recordBufs, V4L2_BUF_TYPE_VIDEO_CAPTURE, MAX_CAM_BUFFERS);
-    CHECK_EQ(ret, 0);
+    ret = _v4l2Rec->setupBufs(_previewWidth, _previewHeight,
+                              V4L2_PIX_FMT_NV12,
+                              MAX_CAM_BUFFERS, 0);
+    CHECK(ret > 0);
 
     /* start with all buffers in queue */
-    for (int i = 0; i < MAX_CAM_BUFFERS; i++) {
-        ret = _v4l2Rec->qbuf(i);
-        CHECK(ret == 0);
-    }
+    ret = _v4l2Rec->qAllBufs();
+    CHECK_EQ(ret, 0);
 
     ret = _v4l2Rec->startStream(true);
     CHECK(ret == 0);
@@ -236,8 +202,8 @@ int SecCamera::startRecord(void)
     ret = _v4l2Rec->waitFrame();
     CHECK_EQ(ret, 0);
 
-    int index = _v4l2Rec->dqbuf();
-    ret = _v4l2Rec->qbuf(index);
+    int index = _v4l2Rec->dqBuf();
+    ret = _v4l2Rec->qBuf(index);
     CHECK(ret == 0);
 
     _isRecordOn = true;
@@ -250,37 +216,38 @@ int SecCamera::stopRecord(void)
 {
     LOGV("%s :", __func__);
 
-    if (_isRecordOn == false)
+    if (!_isRecordOn || _v4l2Rec == NULL) {
         return 0;
+    }
 
 
     int ret = _v4l2Rec->startStream(false);
     CHECK(ret == 0);
 
-    _v4l2Rec->closeBufs(_recordBufs, MAX_CAM_BUFFERS);
+    _v4l2Rec->closeBufs();
     _isRecordOn = false;
 
     LOGI("Recording stopped!");
+#if 0
+    if (_v4l2Rec) {
+        delete _v4l2Rec;
+        _v4l2Rec = NULL;
+    }
+#endif
 
     return 0;
 }
 
-int SecCamera::getRecordBuffer(int* index, unsigned int* addrY, unsigned int* addrC)
+int SecCamera::dqRecordBuffer(int* index, unsigned int* addrY, unsigned int* addrC)
 {
-#ifdef PERFORMANCE
-    LOG_TIME_START(0);
-    _v4l2Rec->waitFrame();
-    LOG_TIME_END(0);
-    LOG_CAMERA("fimc_poll interval: %lu us", LOG_TIME(0));
+    if (!_isRecordOn || _v4l2Rec == NULL) {
+        LOGW("Recording stoped! will ignore dqRecordBuffer!");
+        return -1;
+    }
 
-    LOG_TIME_START(1);
-    *index = _v4l2Rec->dqbuf();
-    LOG_TIME_END(1);
-    LOG_CAMERA("fimc_dqbuf interval: %lu us", LOG_TIME(1));
-#else
     _v4l2Rec->waitFrame();
-    *index = _v4l2Rec->dqbuf();
-#endif
+    //*index = _v4l2Rec->blk_dqbuf();
+    *index = _v4l2Rec->dqBuf();
     if (!(0 <= *index && *index < MAX_CAM_BUFFERS)) {
         LOGE("ERR(%s):wrong index = %d\n", __func__, *index);
         return -1;
@@ -290,39 +257,41 @@ int SecCamera::getRecordBuffer(int* index, unsigned int* addrY, unsigned int* ad
 
     return 0;
 }
-#endif //DUAL_PORT_RECORDING
+
+void SecCamera::qRecordBuffer(int index)
+{
+    if (!_isRecordOn || _v4l2Rec == NULL) {
+        LOGW("Recording stoped! will ignore qRecordBuffer!");
+        return;
+    }
+
+    int ret = _v4l2Rec->qBuf(index);
+    //CHECK(ret == 0);
+}
+#endif
 
 int SecCamera::_getPhyAddr(int index, unsigned int* addrY, unsigned int* addrC)
 {
-    int ret = _v4l2Cam->qbuf(index);
-    CHECK(ret == 0);
-
     _v4l2Cam->getAddr(index, addrY, addrC);
 
     return 0;
 }
 
-int SecCamera::getPreviewBuffer(int* index, unsigned int* addrY, unsigned int* addrC)
+int SecCamera::dqPreviewBuffer(int* index, unsigned int* addrY, unsigned int* addrC)
 {
-#ifdef PERFORMANCE
-    LOG_TIME_START(0);
-    //_v4l2Cam->waitFrame();
-    LOG_TIME_END(0);
-    LOG_CAMERA("fimc_poll interval: %lu us", LOG_TIME(0));
-
-    LOG_TIME_START(1);
-    *index = _v4l2Cam->dqbuf();
-    LOG_TIME_END(1);
-    LOG_CAMERA("fimc_dqbuf interval: %lu us", LOG_TIME(1));
-#else
     *index = _v4l2Cam->blk_dqbuf();
-#endif
     if (!(0 <= *index && *index < MAX_CAM_BUFFERS)) {
         LOGE("ERR(%s):wrong index = %d\n", __func__, *index);
         return -1;
     }
 
-    return _getPhyAddr(*index, addrY, addrC);
+    return _v4l2Cam->getAddr(*index, addrY, addrC);
+}
+
+void SecCamera::qPreviewBuffer(int index)
+{
+    int ret = _v4l2Cam->qBuf(index);
+    LOGE_IF(ret, "Failed to queue preview buffer, %d to camera!", index);
 }
 
 void SecCamera::pausePreview()
@@ -335,19 +304,19 @@ int SecCamera::setPreviewFormat(int width, int height, const char* strPixfmt)
     _previewWidth = width;
     _previewHeight = height;
     _previewPixfmt = _v4l2Cam->nPixfmt(strPixfmt);
-    _previewFrameSize = _v4l2Cam->frameSize(_previewWidth, _previewHeight,
-                                            _previewPixfmt);
 
     LOGI("previewFormat=%dx%d(%s), frameSize=%d",
          width, height, strPixfmt, _previewFrameSize);
 
-    return _previewFrameSize > 0 ? 0 : -1;
+    //return _previewFrameSize > 0 ? 0 : -1;
+    return 0;
 }
 
 unsigned int SecCamera::getPreviewFrameSize(void)
 {
-    return _previewFrameSize;
+    return _v4l2Cam->frameSize();
 }
+
 
 void SecCamera::getPreviewFrameSize(int* width, int* height, int* frameSize)
 {
@@ -356,14 +325,15 @@ void SecCamera::getPreviewFrameSize(int* width, int* height, int* frameSize)
     if (height)
         *height = _previewHeight;
     if (frameSize)
-        *frameSize = _previewFrameSize;
+        *frameSize =  _v4l2Cam->frameSize();
+
 }
 
 // ======================================================================
 // Snapshot
 int SecCamera::endSnapshot(void)
 {
-    return _v4l2Cam->closeBufs(&_captureBuf, 1);
+    return _v4l2Cam->closeBufs();
 }
 
 int SecCamera::startSnapshot(size_t* captureSize)
@@ -372,21 +342,23 @@ int SecCamera::startSnapshot(size_t* captureSize)
     stopPreview();
     LOG_TIME_END(0);
 
-    int ret = _v4l2Cam->setFmt(_snapshotWidth, _snapshotHeight, _snapshotPixfmt, 1);
-    CHECK(ret == 0);
-
+    int ret;
     LOG_TIME_START(1); // prepare
-    _v4l2Cam->initBufs(&_captureBuf, _snapshotWidth, _snapshotHeight, _snapshotPixfmt, 1);
-    _v4l2Cam->reqBufs(V4L2_BUF_TYPE_VIDEO_CAPTURE, 1);
-    _v4l2Cam->queryBufs(&_captureBuf, V4L2_BUF_TYPE_VIDEO_CAPTURE, 1);
-    _v4l2Cam->qbuf(0);
+    ret = _v4l2Cam->setupBufs(_snapshotWidth, _snapshotHeight, _snapshotPixfmt,
+                              1, 1);
+    CHECK_EQ(ret, 1);
+
+    ret = _v4l2Cam->mapBuf(0);
+    CHECK_EQ(ret, 0);
+
+    _v4l2Cam->qBuf(0);
     _v4l2Cam->startStream(true);
     LOG_TIME_END(1);
 
     LOG_CAMERA("%s: stopPreview(%lu), prepare(%lu) us",
                __func__, LOG_TIME(0), LOG_TIME(1));
 
-    *captureSize = _captureBuf.length;
+    _v4l2Cam->mapBufInfo(0, NULL, captureSize);
 
     return 0;
 }
@@ -401,13 +373,13 @@ int SecCamera::getSnapshot(int xth)
     while (skipFirstNFrames) {
         LOGV("skipFrames %d", skipFirstNFrames);
         _v4l2Cam->waitFrame();
-        index = _v4l2Cam->dqbuf();
-        _v4l2Cam->qbuf(index);
+        index = _v4l2Cam->dqBuf();
+        _v4l2Cam->qBuf(index);
         skipFirstNFrames--;
     }
 
     _v4l2Cam->waitFrame();
-    index = _v4l2Cam->dqbuf();
+    index = _v4l2Cam->dqBuf();
     LOG_TIME_END(0);
 
     LOG_TIME_START(1);
@@ -427,14 +399,18 @@ int SecCamera::getRawSnapshot(uint8_t* buffer, size_t size)
         return -1;
     }
 
-    if (size < _captureBuf.length) {
+    void* captureStart;
+    size_t captureSize;
+    _v4l2Cam->mapBufInfo(0, &captureStart, &captureSize);
+
+    if (size < captureSize) {
         LOGE("%s: buffer size, %d is too small! for snapshot size, %d",
-             __func__, size, _captureBuf.length);
+             __func__, size, captureSize);
     } else {
-        size = _captureBuf.length;
+        size = captureSize;
     }
 
-    memcpy(buffer, _captureBuf.start, size);
+    memcpy(buffer, captureStart, size);
 
     return 0;
 }

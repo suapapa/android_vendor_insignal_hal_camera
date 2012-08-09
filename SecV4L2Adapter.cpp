@@ -30,17 +30,6 @@
 
 namespace android {
 
-#ifdef DEBUG_STR_PIXFMT
-const char SecV4L2Adapter::_strPixfmt_yuv420[]   = "YUV420";
-const char SecV4L2Adapter::_strPixfmt_nv12[]     = "NV12";
-const char SecV4L2Adapter::_strPixfmt_nv12t[]    = "NV12T";
-const char SecV4L2Adapter::_strPixfmt_nv21[]     = "NV21";
-const char SecV4L2Adapter::_strPixfmt_yuv422p[]  = "YUV422P";
-const char SecV4L2Adapter::_strPixfmt_yuyv[]     = "YUYV";
-const char SecV4L2Adapter::_strPixfmt_rgb565[]   = "RGB565";
-const char SecV4L2Adapter::_strPixfmt_unknown[]  = "UNKNOWN";
-#endif
-
 int SecV4L2Adapter::nPixfmt(const char* strPixfmt)
 {
     int v4l2Pixfmt;
@@ -67,7 +56,7 @@ int SecV4L2Adapter::nPixfmt(const char* strPixfmt)
     else if (0 == strcmp(strPixfmt, CameraParameters::PIXEL_FORMAT_JPEG))
         v4l2Pixfmt = V4L2_PIX_FMT_YUYV;
     else
-        v4l2Pixfmt = V4L2_PIX_FMT_NV21; //for 3rd party
+        v4l2Pixfmt = V4L2_PIX_FMT_NV21;	//for 3rd party
 
     LOGV("%s: converted %s to %d", __func__, strPixfmt, v4l2Pixfmt);
 
@@ -259,95 +248,20 @@ int SecV4L2Adapter::enumFocusMode(const char* strFocus)
     return enumFocus;
 }
 
-#define ALIGN(B, V)     (((V) + ((B) - 1)) & (~((B) - 1)))
-unsigned int SecV4L2Adapter::frameSize(int width, int height, int v4l2Pixfmt)
+unsigned int SecV4L2Adapter::frameSize()
 {
-    unsigned int bpp, size;
+    LOGW_IF(_bufSize == 0, "Actual buffer size not available yet!");
 
-    switch (v4l2Pixfmt) {
-    case V4L2_PIX_FMT_NV12T:
-        size = ALIGN(8 * 1024, ALIGN(128, width) + ALIGN(32, height)) +
-               ALIGN(8 * 1024, ALIGN(128, width) + ALIGN(32, height >> 1));
-        break;
-
-    case V4L2_PIX_FMT_NV12:
-    case V4L2_PIX_FMT_NV21:
-    case V4L2_PIX_FMT_YUV420:
-        size = (width * height * 3) >> 1;
-        break;
-
-    case V4L2_PIX_FMT_RGB565:
-    case V4L2_PIX_FMT_YUYV:
-    case V4L2_PIX_FMT_YVYU:
-    case V4L2_PIX_FMT_UYVY:
-    case V4L2_PIX_FMT_VYUY:
-    case V4L2_PIX_FMT_NV16:
-    case V4L2_PIX_FMT_NV61:
-    case V4L2_PIX_FMT_YUV422P:
-        size = width * height * 2;
-        break;
-
-    case V4L2_PIX_FMT_RGB32:
-        size = width * height * 4;
-        break;
-
-    default :
-        LOGE("%s: Invalid pixfmt, %d given!", __func__, v4l2Pixfmt);
-        size = 0;
-        break;
-    }
-
-#ifdef DEBUG_STR_PIXFMT
-    LOGV("%s: frames size for %dx%d,%s is %d", __func__,
-         width, height, _strPixfmt(v4l2Pixfmt), size);
-#endif
-
-    return size;
+    return _bufSize;
 }
 
-#ifdef DEBUG_STR_PIXFMT
-const char* SecV4L2Adapter::_strPixfmt(int v4l2Pixfmt)
-{
-    const char* strPixfmt;
-    switch (v4l2Pixfmt) {
-    case V4L2_PIX_FMT_YUV420:
-        strPixfmt = _strPixfmt_yuv420;
-        break;
-    case V4L2_PIX_FMT_NV12:
-        strPixfmt = _strPixfmt_nv12;
-        break;
-    case V4L2_PIX_FMT_NV12T:
-        strPixfmt = _strPixfmt_nv12t;
-        break;
-    case V4L2_PIX_FMT_NV21:
-        strPixfmt = _strPixfmt_nv21;
-        break;
-    case V4L2_PIX_FMT_YUV422P:
-        strPixfmt = _strPixfmt_yuv422p;
-        break;
-    case V4L2_PIX_FMT_YUYV:
-        strPixfmt = _strPixfmt_yuyv;
-        break;
-    case V4L2_PIX_FMT_RGB565:
-        strPixfmt = _strPixfmt_rgb565;
-        break;
-    default:
-        LOGE("%s: unknown pixfmt, %d given!", __func__, v4l2Pixfmt);
-        strPixfmt = _strPixfmt_unknown;
-        break;
-    }
-
-    LOGV("%s: converted %d to %s", __func__, v4l2Pixfmt, strPixfmt);
-
-    return strPixfmt;
-}
-#endif
-
-SecV4L2Adapter::SecV4L2Adapter(const char* path, int ch) :
+SecV4L2Adapter::SecV4L2Adapter(const char* path, int ch):
     _fd(0),
-    _index(-1)
+    _chIdx(-1),
+    _bufCnt(0),
+    _bufSize(0)
 {
-    LOGV("opeing %s (ch=%d)...", path, ch);
+    LOGI("opening %s (ch=%d)...", path, ch);
     int err = 0;
     err |= _openCamera(path);
     err |= _setInputChann(ch);
@@ -360,13 +274,20 @@ SecV4L2Adapter::SecV4L2Adapter(const char* path, int ch) :
             _fd = 0;
         }
     }
+
+    for (int i = 0; i < MAX_CAM_BUFFERS; i++) {
+        _bufMapStart[i];
+    }
+    LOGI("opened %s (ch=%d)...", path, ch);
 }
 
 SecV4L2Adapter::~SecV4L2Adapter()
 {
-    LOGV("%s", __func__);
-    if (_fd)
+    LOGI("%s", __func__);
+    if (_fd) {
         close(_fd);
+        _fd = 0;
+    }
 }
 
 int SecV4L2Adapter::_openCamera(const char* path)
@@ -407,10 +328,11 @@ int SecV4L2Adapter::_openCamera(const char* path)
 
 int SecV4L2Adapter::_setInputChann(int ch)
 {
+    LOG_CAMERA_FUNC_ENTER;
     struct v4l2_input input;
     int ret;
 
-    if (ch == _index)
+    if (ch == _chIdx)
         return 0;
 
     if (_fd == 0) {
@@ -418,33 +340,31 @@ int SecV4L2Adapter::_setInputChann(int ch)
         return -1;
     }
 
+    LOGI("%s: enum chan", __func__);
     input.index = ch;
     if (ioctl(_fd, VIDIOC_ENUMINPUT, &input) != 0) {
         LOGE("ERR(%s):No matching index found\n", __func__);
         return -1;
     }
 
+    LOGI("%s: set input", __func__);
     ret = ioctl(_fd, VIDIOC_S_INPUT, &input);
     if (ret < 0) {
         LOGE("ERR(%s):VIDIOC_S_INPUT failed\n", __func__);
         return ret;
     }
 
-    LOGI("Name of input channel[%d] is %s\n", input.index, input.name);
+    LOGI("Name of input channel[%d] is %d\n", input.index, _fd);
 
-    _index = input.index;
+    _chIdx = input.index;
 
     return 0;
 }
 
-int SecV4L2Adapter::setFmt(int w, int h, unsigned int fmt, int flag)
+int SecV4L2Adapter::_setFmt(int w, int h, unsigned int fmt, int flag)
 {
+    LOG_CAMERA_FUNC_ENTER;
     int ret;
-
-    if (_fd == 0) {
-        LOGE("%s: camera not opened!", __func__);
-        return -1;
-    }
 
     struct v4l2_fmtdesc fmtdesc;
     fmtdesc.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
@@ -467,92 +387,171 @@ int SecV4L2Adapter::setFmt(int w, int h, unsigned int fmt, int flag)
     }
 
     struct v4l2_format v4l2_fmt;
-    v4l2_fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-
     struct v4l2_pix_format pixfmt;
+
     memset(&pixfmt, 0, sizeof(pixfmt));
 
     pixfmt.width = w;
     pixfmt.height = h;
     pixfmt.pixelformat = fmt;
 
-    pixfmt.sizeimage = frameSize(w, h, fmt);
+    //pixfmt.sizeimage = frameSize(w, h, fmt);
 
     pixfmt.field = V4L2_FIELD_NONE;
     pixfmt.priv = flag;
+
+    v4l2_fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     v4l2_fmt.fmt.pix = pixfmt;
 
     /* Set up for capture */
     ret = ioctl(_fd, VIDIOC_S_FMT, &v4l2_fmt);
     if (ret < 0) {
-        LOGE("ERR(%s):VIDIOC_S_FMT failed\n", __func__);
+        LOGE("%s: VIDIOC_S_FMT failed!", __func__);
         return -1;
     }
 
     return ret;
 }
 
-int SecV4L2Adapter::reqBufs(enum v4l2_buf_type t, int n)
+int SecV4L2Adapter::_reqBufs(int n)
 {
     LOG_CAMERA_FUNC_ENTER;
     struct v4l2_requestbuffers req;
     int ret;
 
-    if (_fd == 0) {
-        LOGE("%s: camera not opened!", __func__);
-        return -1;
-    }
-
-    req.count = n;
-    req.type = t;
+    req.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     req.memory = V4L2_MEMORY_MMAP;
+    req.count = n;
 
     ret = ioctl(_fd, VIDIOC_REQBUFS, &req);
     if (ret < 0) {
-        LOGE("ERR(%s):VIDIOC_REQBUFS failed\n", __func__);
+        LOGE("%s: VIDIOC_REQBUFS failed!", __func__);
         return -1;
     }
 
-    return req.count;
+    LOGW_IF(n != 1 && req.count == 1, "insufficient buffer avaiable!");
+
+    _bufCnt = req.count;
+
+    return 0;
 }
 
-int SecV4L2Adapter::queryBufs(struct v4l2Buffer* bufs, enum v4l2_buf_type type, int n)
+int SecV4L2Adapter::_queryBuf(int idx, int* length, int* offset)
 {
     LOG_CAMERA_FUNC_ENTER;
     struct v4l2_buffer v4l2_buf;
-    int i, ret;
+    int ret;
 
+    v4l2_buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+    v4l2_buf.memory = V4L2_MEMORY_MMAP;
+    v4l2_buf.index = idx;
+
+    ret = ioctl(_fd, VIDIOC_QUERYBUF, &v4l2_buf);
+    if (ret < 0) {
+        LOGE("%s: VIDIOC_QUERYBUF failed!", __func__);
+        return -1;
+    }
+
+    int l = v4l2_buf.length;
+    int o = v4l2_buf.m.offset;
+    LOGV("buffer-%d: length = %d, offset = %d", idx, l, o);
+
+    if (_bufSize == 0)
+        _bufSize = l;
+
+    LOGE_IF(_bufSize != (size_t)l,
+            "%s: Invaild length! _bufSize = %d, l = %d", __func__,
+            _bufSize, l);
+
+    if (length)
+        *length = l;
+    if (offset)
+        *offset = o;
+
+    return 0;
+}
+
+int SecV4L2Adapter::setupBufs(int w, int h, unsigned int fmt, unsigned int n,
+                              int flag)
+{
+    LOG_CAMERA_FUNC_ENTER;
     if (_fd == 0) {
         LOGE("%s: camera not opened!", __func__);
         return -1;
     }
 
-    for (i = 0; i < n; i++) {
-        v4l2_buf.type = type;
-        v4l2_buf.memory = V4L2_MEMORY_MMAP;
-        v4l2_buf.index = i;
+    int err;
+    err = _setFmt(w, h, fmt, flag);
+    if (err)
+        return -1;
 
-        ret = ioctl(_fd, VIDIOC_QUERYBUF, &v4l2_buf);
-        if (ret < 0) {
-            LOGE("ERR(%s):VIDIOC_QUERYBUF failed\n", __func__);
-            return -1;
-        }
+    _reqBufs(n);
+    if (_bufCnt == 0)
+        return -1;
 
-        bufs[i].length = v4l2_buf.length;
+    LOGW_IF(n > _bufCnt, "only %d buffers available! req = %d", _bufCnt, n);
 
-        if (n == 1) {
-            bufs[i].length = v4l2_buf.length;
-            if ((bufs[i].start = (char*)mmap(0, v4l2_buf.length,
-                                             PROT_READ | PROT_WRITE, MAP_SHARED,
-                                             _fd, v4l2_buf.m.offset)) < 0) {
-                LOGE("%s %d] mmap() failed\n", __func__, __LINE__);
-                return -1;
-            }
-
-            LOGV("bufs[%d].start = %p v4l2_buf.length = %d",
-                 i, bufs[i].start, v4l2_buf.length);
-        }
+    for (unsigned int i = 0; i < _bufCnt; i++) {
+        _queryBuf(i, NULL, NULL);
     }
+
+    // return available buffer count;
+    return _bufCnt;
+}
+
+int SecV4L2Adapter::mapBuf(int idx)
+{
+    int length;
+    int offset;
+    int err = _queryBuf(idx, &length, &offset);
+    if (err || length == 0) {
+        LOGE("%s: aborted mmap-%d!", __func__, idx);
+        return -1;
+    }
+
+    void* start = mmap(0, length, PROT_READ | PROT_WRITE, MAP_SHARED,
+                       _fd, offset);
+    if (start == MAP_FAILED) {
+        LOGE("%s: mmap() failed. idx = %d, length = %d, offset = %d",
+             __func__, idx, length, offset);
+        return -1;
+    }
+
+    if (_bufMapStart[idx] != NULL) {
+        LOGE("%s: mmaped alread in %d!", __func__, idx);
+        return -1;
+    }
+
+    _bufMapStart[idx] = start;
+
+    return 0;
+}
+
+int SecV4L2Adapter::mapBufInfo(int idx, void** start, size_t* size)
+{
+    if (size)
+        *size = _bufSize;
+    if (start)
+        *start = _bufMapStart[idx];
+    return 0;
+}
+
+int SecV4L2Adapter::closeBufs()
+{
+    LOG_CAMERA_FUNC_ENTER;
+
+    for (unsigned int i = 0; i < _bufCnt; i++) {
+        if (_bufMapStart[i] == NULL)
+            continue;
+
+        munmap(_bufMapStart[i], _bufSize);
+        LOGV("munmap-%d : addr = 0x%p size = %d\n",
+             i, _bufMapStart[i], _bufSize);
+        _bufMapStart[i] = NULL;
+    }
+
+    _bufCnt = 0;
+    _bufSize = 0;
 
     return 0;
 }
@@ -570,20 +569,26 @@ int SecV4L2Adapter::startStream(bool on)
 
     ret = ioctl(_fd, on ? VIDIOC_STREAMON : VIDIOC_STREAMOFF, &type);
     if (ret < 0) {
-        LOGE("ERR(%s): Failed stream %s", __func__, on ? "on" : "off");
+        LOGE("ERR(%s): Failed stream %s", __func__,
+             on ? "on" : "off");
         return ret;
     }
 
     return ret;
 }
 
-int SecV4L2Adapter::qbuf(int idx)
+int SecV4L2Adapter::qBuf(unsigned int idx)
 {
     struct v4l2_buffer v4l2_buf;
     int ret;
 
     if (_fd == 0) {
         LOGE("%s: camera not opened!", __func__);
+        return -1;
+    }
+
+    if (idx > (_bufCnt - 1)) {
+        LOGE("%s: invalid index, %d!", __func__, idx);
         return -1;
     }
 
@@ -600,7 +605,7 @@ int SecV4L2Adapter::qbuf(int idx)
     return 0;
 }
 
-int SecV4L2Adapter::dqbuf(void)
+int SecV4L2Adapter::dqBuf(void)
 {
     struct v4l2_buffer v4l2_buf;
     int ret;
@@ -615,11 +620,28 @@ int SecV4L2Adapter::dqbuf(void)
 
     ret = ioctl(_fd, VIDIOC_DQBUF, &v4l2_buf);
     if (ret < 0) {
-        LOGE("ERR(%s):VIDIOC_DQBUF failed\n", __func__);
+        LOGE("%s: VIDIOC_DQBUF failed\n", __func__);
         return ret;
     }
 
+    if (v4l2_buf.index > (_bufCnt - 1)) {
+        LOGE("%s: invalid index, %d!", __func__, v4l2_buf.index);
+        return -1;
+    }
+
     return v4l2_buf.index;
+}
+
+int SecV4L2Adapter::qAllBufs(void)
+{
+    int err;
+    for (unsigned int i = 0; i < _bufCnt; i++) {
+        err = qBuf(i);
+        if (err)
+            return err;
+    }
+
+    return 0;
 }
 
 int SecV4L2Adapter::blk_dqbuf(void)
@@ -640,17 +662,18 @@ int SecV4L2Adapter::blk_dqbuf(void)
     if (ret < 0) {
         // LOGV("VIDIOC_DQBUF first is empty") ;
         waitFrame();
-        return dqbuf();
+        return dqBuf();
     } else {
         index = v4l2_buf.index;
         while (ret == 0) {
             ret = ioctl(_fd, VIDIOC_DQBUF, &v4l2_buf);
             if (ret == 0) {
                 LOGV("VIDIOC_DQBUF is not still empty %d", v4l2_buf.index);
-                qbuf(index);
+                qBuf(index);
                 index = v4l2_buf.index;
             } else {
-                LOGV("VIDIOC_DQBUF is empty now %d ", index);
+                LOGV("VIDIOC_DQBUF is empty now %d ",
+                     index);
                 return index;
             }
         }
@@ -672,8 +695,7 @@ int SecV4L2Adapter::getCtrl(int id)
 
     ret = ioctl(_fd, VIDIOC_G_CTRL, &ctrl);
     if (ret < 0) {
-        LOGE("ERR(%s): VIDIOC_G_CTRL(id = 0x%x (%d)) failed, ret = %d\n",
-             __func__, id, id - V4L2_CID_PRIVATE_BASE, ret);
+        LOGE("ERR(%s): VIDIOC_G_CTRL(id = 0x%x (%d)) failed, ret = %d\n", __func__, id, id - V4L2_CID_PRIVATE_BASE, ret);
         return ret;
     }
 
@@ -695,8 +717,7 @@ int SecV4L2Adapter::setCtrl(int id, int value)
 
     ret = ioctl(_fd, VIDIOC_S_CTRL, &ctrl);
     if (ret < 0) {
-        LOGE("ERR(%s):VIDIOC_S_CTRL(id = %#x (%d), value = %d) failed ret = %d\n",
-             __func__, id, id - V4L2_CID_PRIVATE_BASE, value, ret);
+        LOGE("ERR(%s):VIDIOC_S_CTRL(id = %#x (%d), value = %d) failed ret = %d\n", __func__, id, id - V4L2_CID_PRIVATE_BASE, value, ret);
         return ret;
     }
 
@@ -771,54 +792,23 @@ int SecV4L2Adapter::getAddr(int idx, unsigned int* addrY, unsigned int* addrC)
     return 0;
 }
 
-int SecV4L2Adapter::waitFrame(void)
+int SecV4L2Adapter::waitFrame(int timeout)
 {
     int ret;
 
     /* 10 second delay is because sensor can take a long time
      * to do auto focus and capture in dark settings
      */
-    ret = poll(&_poll, 1, 10000);
+    ret = poll(&_poll, 1, timeout);
     if (ret < 0) {
-        LOGE("ERR(%s):poll error\n", __func__);
+        LOGE("ERR(%s):poll error, revent = %d\n", __func__,
+             _poll.revents);
         return ret;
     }
 
     if (ret == 0) {
-        LOGE("ERR(%s):No data in 10 secs..\n", __func__);
+        LOGE("ERR(%s):No data in %d msecs..\n", __func__, timeout);
         return ret;
-    }
-
-    return 0;
-}
-
-int SecV4L2Adapter::initBufs(struct v4l2Buffer* bufs, int w, int h, int fmt, int n)
-{
-    LOG_CAMERA_FUNC_ENTER;
-    int i, len;
-
-    len = frameSize(w, h, fmt);
-
-    for (i = 0; i < n; i++) {
-        bufs[i].start = NULL;
-        bufs[i].length = len;
-    }
-
-    return 0;
-}
-
-int SecV4L2Adapter::closeBufs(struct v4l2Buffer* bufs, int n)
-{
-    LOG_CAMERA_FUNC_ENTER;
-    int i;
-
-    for (i = 0; i < n; i++) {
-        if (bufs[i].start) {
-            munmap(bufs[i].start, bufs[i].length);
-            LOGV("munmap():virt. addr[%d]: 0x%x size = %d\n",
-                 i, (unsigned int) bufs[i].start, bufs[i].length);
-            bufs[i].start = NULL;
-        }
     }
 
     return 0;
@@ -831,8 +821,7 @@ int SecV4L2Adapter::getFd(void)
 
 int SecV4L2Adapter::getChIdx(void)
 {
-    return _index;
+    return _chIdx;
 }
 
 };
-

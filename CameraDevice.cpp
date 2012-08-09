@@ -33,9 +33,14 @@ static int cam_dev_set_preview_window(struct camera_device* dev,
                                       struct preview_stream_ops* window)
 {
     LOG_CAMERA_FUNC_ENTER;
-    int ret = CALL_HW(setPreviewWindow, window);
-    LOG_CAMERA_FUNC_EXIT;
-    return ret;
+    if (dev->priv == NULL) {
+        LOGW_IF(window, "camera device already released and, "
+                "cam_dev_set_preview_window will be ignored!");
+        return 0;
+    }
+
+    return CALL_HW(setPreviewWindow, window);
+
 }
 
 static void cam_dev_set_callbacks(struct camera_device* dev,
@@ -48,7 +53,7 @@ static void cam_dev_set_callbacks(struct camera_device* dev,
     LOG_CAMERA_FUNC_ENTER;
     CALL_HW(setCallbacks,
             notify_cb, data_cb, data_cb_ts, req_memory, user);
-    LOG_CAMERA_FUNC_EXIT;
+
 }
 
 static void cam_dev_enable_msg_type(struct camera_device* dev,
@@ -56,7 +61,6 @@ static void cam_dev_enable_msg_type(struct camera_device* dev,
 {
     LOG_CAMERA_FUNC_ENTER;
     CALL_HW(enableMsgType, msg_type);
-    LOG_CAMERA_FUNC_EXIT;
 }
 
 static void cam_dev_disable_msg_type(struct camera_device* dev,
@@ -64,111 +68,89 @@ static void cam_dev_disable_msg_type(struct camera_device* dev,
 {
     LOG_CAMERA_FUNC_ENTER;
     CALL_HW(disableMsgType, msg_type);
-    LOG_CAMERA_FUNC_EXIT;
 }
 
 static int cam_dev_msg_type_enabled(struct camera_device* dev,
                                     int32_t msg_type)
 {
     LOG_CAMERA_FUNC_ENTER;
-    int ret = CALL_HW(msgTypeEnabled, msg_type);
-    LOG_CAMERA_FUNC_EXIT;
-    return ret;
+    return CALL_HW(msgTypeEnabled, msg_type);
 }
 
 static int cam_dev_start_preview(struct camera_device* dev)
 {
     LOG_CAMERA_FUNC_ENTER;
-    int ret = CALL_HW(startPreview);
-    LOG_CAMERA_FUNC_EXIT;
-    return ret;
+    return CALL_HW(startPreview);
 }
 
 static void cam_dev_stop_preview(struct camera_device* dev)
 {
     LOG_CAMERA_FUNC_ENTER;
     CALL_HW(stopPreview);
-    LOG_CAMERA_FUNC_EXIT;
+
 }
 
 static int cam_dev_preview_enabled(struct camera_device* dev)
 {
     LOG_CAMERA_FUNC_ENTER;
-    int ret = CALL_HW(previewEnabled);
-    LOG_CAMERA_FUNC_EXIT;
-    return ret;
+    return CALL_HW(previewEnabled);
 }
 
 static int cam_dev_store_meta_data_in_buffers(struct camera_device* dev,
-                                              int enable)
+        int enable)
 {
     LOG_CAMERA_FUNC_ENTER;
-    int ret = CALL_HW(storeMetaDataInBuffers, enable);
-    LOG_CAMERA_FUNC_EXIT;
-    return ret;
+    return CALL_HW(storeMetaDataInBuffers, enable);
 }
 
 static int cam_dev_start_recording(struct camera_device* dev)
 {
     LOG_CAMERA_FUNC_ENTER;
-    int ret = CALL_HW(startRecording);
-    LOG_CAMERA_FUNC_EXIT;
-    return ret;
+    return CALL_HW(startRecording);
 }
 
 static void cam_dev_stop_recording(struct camera_device* dev)
 {
     LOG_CAMERA_FUNC_ENTER;
     CALL_HW(stopRecording);
-    LOG_CAMERA_FUNC_EXIT;
+
 }
 
 static int cam_dev_recording_enabled(struct camera_device* dev)
 {
     LOG_CAMERA_FUNC_ENTER;
-    int ret = CALL_HW(recordingEnabled);
-    LOG_CAMERA_FUNC_EXIT;
-    return ret;
+    return CALL_HW(recordingEnabled);
 }
 
 static void cam_dev_release_recording_frame(struct camera_device* dev,
-                                            const void* opaque)
+        const void* opaque)
 {
     LOG_CAMERA_FUNC_ENTER;
     CALL_HW(releaseRecordingFrame, opaque);
-    LOG_CAMERA_FUNC_EXIT;
 }
 
 static int cam_dev_auto_focus(struct camera_device* dev)
 {
     LOG_CAMERA_FUNC_ENTER;
-    int ret = CALL_HW(autoFocus);
-    LOG_CAMERA_FUNC_EXIT;
-    return ret;
+    return CALL_HW(autoFocus);
 }
 
 static int cam_dev_cancel_auto_focus(struct camera_device* dev)
 {
     LOG_CAMERA_FUNC_ENTER;
-    int ret = CALL_HW(cancelAutoFocus);
-    LOG_CAMERA_FUNC_EXIT;
-    return ret;
+    return CALL_HW(cancelAutoFocus);
 }
 
 static int cam_dev_take_picture(struct camera_device* dev)
 {
     LOG_CAMERA_FUNC_ENTER;
-    int ret = CALL_HW(takePicture);
-    LOG_CAMERA_FUNC_EXIT;
-    return ret;
+    return CALL_HW(takePicture);
 }
 
 static int cam_dev_cancel_picture(struct camera_device* dev)
 {
     LOG_CAMERA_FUNC_ENTER;
-    int ret = CALL_HW(cancelPicture);
-    LOG_CAMERA_FUNC_EXIT;
-    return ret;
+    return CALL_HW(cancelPicture);
 }
 
 static int cam_dev_set_parameters(struct camera_device* dev, const char* parms)
@@ -176,9 +158,7 @@ static int cam_dev_set_parameters(struct camera_device* dev, const char* parms)
     LOG_CAMERA_FUNC_ENTER;
     String8 str(parms);
     CameraParameters p(str);
-    int ret = CALL_HW(setParameters, p);
-    LOG_CAMERA_FUNC_EXIT;
-    return ret;
+    return CALL_HW(setParameters, p);
 }
 
 static char* cam_dev_get_parameters(struct camera_device* dev)
@@ -187,7 +167,7 @@ static char* cam_dev_get_parameters(struct camera_device* dev)
     CameraParameters parms = CALL_HW(getParameters);
     String8 str = parms.flatten();
     char* ret = strdup(str.string());
-    LOG_CAMERA_FUNC_EXIT;
+
     return ret;
 }
 
@@ -195,31 +175,30 @@ static void cam_dev_put_parameters(struct camera_device* dev, char* parms)
 {
     LOG_CAMERA_FUNC_ENTER;
     free(parms);
-    LOG_CAMERA_FUNC_EXIT;
 }
 
 static int cam_dev_send_command(struct camera_device* dev,
                                 int32_t cmd, int32_t arg1, int32_t arg2)
 {
     LOG_CAMERA_FUNC_ENTER;
-    int ret = CALL_HW(sendCommand, cmd, arg1, arg2);
-    LOG_CAMERA_FUNC_EXIT;
-    return ret;
+    return CALL_HW(sendCommand, cmd, arg1, arg2);
 }
 
 static void cam_dev_release(struct camera_device* dev)
 {
     LOG_CAMERA_FUNC_ENTER;
-    CALL_HW(release);
-    LOG_CAMERA_FUNC_EXIT;
+    //CALL_HW(release);
+    if (dev->priv) {
+        delete static_cast<CameraHardware*>(dev->priv);
+        dev->priv = NULL;
+    }
+
 }
 
 static int cam_dev_dump(struct camera_device* dev, int fd)
 {
     LOG_CAMERA_FUNC_ENTER;
-    int ret = CALL_HW(dump, fd);
-    LOG_CAMERA_FUNC_EXIT;
-    return ret;
+    return CALL_HW(dump, fd);
 }
 
 #define SET_METHOD(m) m : cam_dev_##m
@@ -263,14 +242,15 @@ static int cam_dev_close(struct hw_device_t* device)
         goto exit;
     }
 
-    if (g_dev->priv)
-        delete static_cast<CameraHardware *>(g_dev->priv);
+    if (g_dev->priv) {
+        delete static_cast<CameraHardware*>(g_dev->priv);
+        g_dev->priv = NULL;
+    }
 
     delete g_dev;
     g_dev = NULL;
 
 exit:
-    LOG_CAMERA_FUNC_EXIT;
     return 0;
 }
 

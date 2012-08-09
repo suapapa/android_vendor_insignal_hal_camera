@@ -23,10 +23,10 @@
 static char strFourCC[4 + 1];
 static char* getStrFourCC(unsigned int fourCC)
 {
-    strFourCC[0] = (fourCC >> 24) & 0xff;
-    strFourCC[1] = (fourCC >> 16) & 0xff;
-    strFourCC[2] = (fourCC >> 8) & 0xff;
-    strFourCC[3] = (fourCC) & 0xff;
+    strFourCC[0] = (fourCC) & 0xff;
+    strFourCC[1] = (fourCC >> 8) & 0xff;
+    strFourCC[2] = (fourCC >> 16) & 0xff;
+    strFourCC[3] = (fourCC >> 24) & 0xff;
     strFourCC[4] = 0;
 
     return strFourCC;

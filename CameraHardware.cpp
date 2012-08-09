@@ -58,12 +58,9 @@ CameraHardware::CameraHardware(int cameraId)
       _parms(),
       _window(NULL)
 {
-    LOGV("%s :", __func__);
+    LOGI("%s :", __func__);
 
-    // TODO : get path and ch-idx from CameraFactory
-    const char* camPath = CAMERA_DEV_NAME;
-    const char* recPath = CAMERA_DEV_NAME2;
-    _camera = new SecCamera(camPath, recPath, cameraId);
+    _camera = new SecCamera(cameraId);
     if (_camera->getFd() == 0) {
         delete _camera;
         _camera = NULL;
@@ -71,18 +68,22 @@ CameraHardware::CameraHardware(int cameraId)
         return;
     }
 
+    LOGI("%s: initing params", __func__);
     _cameraId = cameraId;
     _initParams();
     setParameters(_parms, true);
 
+    LOGI("%s: start preview thread", __func__);
     _previewState = PREVIEW_IDLE;
     _previewThread = new PreviewThread(this);
     _previewThread->startLoop();
 
+    LOGI("%s: start focus thread", __func__);
     _focusState = FOCUS_IDLE;
     _focusThread = new FocusThread(this);
     _focusThread->startLoop();
 
+    LOGI("%s: prepare picture thread", __func__);
     _pictureState = PICTURE_IDLE;
     _pictureThread = new PictureThread(this);
 
@@ -208,8 +209,7 @@ status_t CameraHardware::_fillWindow(const char* previewFrame,
 
     void* vaddr[3];
     int grallocUsage = GRALLOC_USAGE_SW_WRITE_OFTEN | GRALLOC_USAGE_YUV_ADDR;
-    status_t res = grbuffer_mapper.lock(*buf, grallocUsage,
-                                        bounds, vaddr);
+    status_t res = grbuffer_mapper.lock(*buf, grallocUsage, bounds, vaddr);
     if (res != NO_ERROR) {
         LOGE("%s: grbuffer_mapper.lock failure: %d -> %s",
              __func__, res, strerror(res));
@@ -282,7 +282,7 @@ bool CameraHardware::_previewLoop()
     _previewLock.unlock();
 
     int index;
-    int ret = _camera->getPreviewBuffer(&index, NULL, NULL);
+    int ret = _camera->dqPreviewBuffer(&index, NULL, NULL);
     if (0 > ret || 0 > index) {
         LOGW("Is preview frame not readied?");
         return true;
@@ -298,35 +298,40 @@ bool CameraHardware::_previewLoop()
         _fillWindow(((const char*)_previewHeap->data) + offset, w, h, preview_format);
     }
 
+    _camera->qPreviewBuffer(index);
+
     // Notify the client of a new frame.
     if (_cbData && (_msgs & CAMERA_MSG_PREVIEW_FRAME)) {
         _cbData(CAMERA_MSG_PREVIEW_FRAME, _previewHeap, index, NULL, _cbCookie);
     }
 
     _previewLock.lock();
-    if (_previewState == PREVIEW_RECORDING) {
-        unsigned int phyYAddr, phyCAddr;
-        int ret = _camera->getRecordBuffer(&index, &phyYAddr, &phyCAddr);
-        if (0 > ret || 0 > index) {
-            LOGW("Is record frame not readied?");
-            return true;
-        }
-
-        struct ADDRS* addrs     = (struct ADDRS*)_recordHeap->data;
-        addrs[index].type       = kMetadataBufferTypeCameraSource;
-        addrs[index].addr_y     = phyYAddr;
-        addrs[index].addr_cbcr  = phyCAddr;
-        addrs[index].buf_idx    = index;
-
-        // Notify the client of a new frame.
-        if (_cbDataWithTS && (_msgs & CAMERA_MSG_VIDEO_FRAME)) {
-            _cbDataWithTS(timestamp, CAMERA_MSG_VIDEO_FRAME,
-                          _recordHeap, index, _cbCookie);
-        } else {
-            _camera->releaseRecordFrame(index);
-        }
+    if (_previewState != PREVIEW_RECORDING) {
+        _previewLock.unlock();
+        return true;
     }
     _previewLock.unlock();
+
+    unsigned int phyYAddr, phyCAddr;
+    ret = _camera->dqRecordBuffer(&index, &phyYAddr, &phyCAddr);
+    if (0 > ret || 0 > index) {
+        LOGW("Is record frame not readied?");
+        return true;
+    }
+
+    struct ADDRS* addrs     = (struct ADDRS*)_recordHeap->data;
+    addrs[index].type       = kMetadataBufferTypeCameraSource;
+    addrs[index].addr_y     = phyYAddr;
+    addrs[index].addr_cbcr  = phyCAddr;
+    addrs[index].buf_idx    = index;
+
+    // Notify the client of a new frame.
+    if (_cbDataWithTS && (_msgs & CAMERA_MSG_VIDEO_FRAME)) {
+        _cbDataWithTS(timestamp, CAMERA_MSG_VIDEO_FRAME,
+                      _recordHeap, index, _cbCookie);
+    } else {
+        _camera->qRecordBuffer(index);
+    }
 
     return true;
 }
@@ -479,7 +484,7 @@ bool CameraHardware::recordingEnabled()
 void CameraHardware::releaseRecordingFrame(const void* opaque)
 {
     struct ADDRS* addrs = (struct ADDRS*)opaque;
-    _camera->releaseRecordFrame(addrs->buf_idx);
+    _camera->qRecordBuffer(addrs->buf_idx);
 }
 
 bool CameraHardware::_focusLoop()
@@ -898,7 +903,6 @@ void CameraHardware::release()
          * up and can exit.
          */
         _previewLock.lock();
-        _previewThread->requestExit();
         _previewState = PREVIEW_ABORT;
         _previewStateChangedCondition.signal();
         _previewLock.unlock();
@@ -911,7 +915,6 @@ void CameraHardware::release()
          * on the condition variable.  signal it so it wakes up and can exit.
          */
         _focusLock.lock();
-        _focusThread->requestExit();
         _focusState = FOCUS_ABORT;
         _focusStateChangedCondition.signal();
         _focusLock.unlock();
@@ -943,7 +946,6 @@ void CameraHardware::release()
      */
     if (_camera != NULL) {
         delete _camera;
-        //_camera->Destroy();
         _camera = NULL;
     }
 }

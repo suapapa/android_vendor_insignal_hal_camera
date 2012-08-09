@@ -21,14 +21,9 @@
 #include <linux/videodev2.h>
 #include "videodev2_samsung.h"
 
-#undef DEBUG_STR_PIXFMT
+#define MAX_CAM_BUFFERS         (8)
 
 namespace android {
-
-struct v4l2Buffer {
-    void*   start;
-    size_t  length;
-};
 
 class SecV4L2Adapter {
 public:
@@ -38,20 +33,20 @@ public:
     int getFd(void);
     int getChIdx(void);
 
-    int setFmt(int w, int h, unsigned int fmt, int flag);
-    int reqBufs(enum v4l2_buf_type t, int n);
-    int queryBufs(struct v4l2Buffer* bufs, enum v4l2_buf_type type, int n);
-    int initBufs(struct v4l2Buffer* bufs, int w, int h, int fmt, int n);
-    int closeBufs(struct v4l2Buffer* bufs, int n);
+    int setupBufs(int w, int h, unsigned int fmt, unsigned int n, int flag = 0);
+    int mapBuf(int idx);
+    int mapBufInfo(int idx, void** start, size_t* size);
+    int closeBufs(void);
     int startStream(bool on);
-    int qbuf(int idx);
-    int dqbuf(void);
+    int qBuf(unsigned int idx);
+    int dqBuf(void);
+    int qAllBufs(void);
     int blk_dqbuf(void);
     int getCtrl(int id);
     int setCtrl(int id, int value);
     int getParm(struct sec_cam_parm* parm);
     int setParm(const struct sec_cam_parm* parm);
-    int waitFrame(void);
+    int waitFrame(int timeout = 10000);
 
     int getAddr(int idx, unsigned int* addrY, unsigned int* addrC);
 
@@ -64,28 +59,23 @@ public:
 
     int nPixfmt(const char* strPixfmt);
 
-    unsigned int frameSize(int v4l2_pixfmt, int width, int height);
+    unsigned int frameSize(void);
 
 private:
     int	_fd;
-    int _index;
+    int _chIdx;
     struct pollfd _poll;
+
+    unsigned int _bufCnt;
+    size_t _bufSize;
+    void* _bufMapStart[MAX_CAM_BUFFERS];
 
     int _openCamera(const char* path);
     int _setInputChann(int ch);
 
-#ifdef DEBUG_STR_PIXFMT
-    const char* _strPixfmt(int v4l2Pixfmt);
-
-    static const char _strPixfmt_yuv420[];
-    static const char _strPixfmt_nv12[];
-    static const char _strPixfmt_nv12t[];
-    static const char _strPixfmt_nv21[];
-    static const char _strPixfmt_yuv422p[];
-    static const char _strPixfmt_yuyv[];
-    static const char _strPixfmt_rgb565[];
-    static const char _strPixfmt_unknown[];
-#endif
+    int _setFmt(int w, int h, unsigned int fmt, int flag);
+    int _reqBufs(int n);
+    int _queryBuf(int idx, int* length, int* offset);
 };
 
 };

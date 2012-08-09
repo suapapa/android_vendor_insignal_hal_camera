@@ -21,21 +21,13 @@
 #include "EncoderInterface.h"
 #include "TaggerInterface.h"
 
+#define DUAL_PORT_RECORDING
+
 namespace android {
-
-#define DUAL_PORT_RECORDING //Define this if 2 fimc ports are needed for recording.
-
-#define CAMERA_DEV_NAME         "/dev/video0"
-
-#ifdef DUAL_PORT_RECORDING
-#define CAMERA_DEV_NAME2        "/dev/video2"
-#endif
-
-#define MAX_CAM_BUFFERS         (8)
 
 class SecCamera {
 public:
-    SecCamera(const char* camPath, const char* recPath, int ch);
+    SecCamera(int ch);
     ~SecCamera();
 
     int                 flagCreate(void) const;
@@ -43,14 +35,15 @@ public:
     int                 startPreview(void);
     int                 stopPreview(void);
     void                pausePreview();
+    int                 dqPreviewBuffer(int* index, unsigned int* addrY, unsigned int* addrC);
+    void                qPreviewBuffer(int index);
+
 #ifdef DUAL_PORT_RECORDING
     int                 startRecord(void);
     int                 stopRecord(void);
-    int                 getRecordBuffer(int* index, unsigned int* addrY, unsigned int* addrC);
-    void                releaseRecordFrame(int i);
+    int                 dqRecordBuffer(int* index, unsigned int* addrY, unsigned int* addrC);
+    void                qRecordBuffer(int index);
 #endif
-
-    int                 getPreviewBuffer(int* index, unsigned int* addrY, unsigned int* addrC);
 
     int                 setPreviewFormat(int width, int height, const char* strPixfmt);
     unsigned int        getPreviewFrameSize(void);
@@ -112,14 +105,7 @@ private:
     int                 _snapshotPixfmt;
 
     bool                _isPreviewOn;
-
-    struct v4l2Buffer   _previewBufs[MAX_CAM_BUFFERS];
-    struct v4l2Buffer   _captureBuf;
-
-#ifdef DUAL_PORT_RECORDING
     bool                _isRecordOn;
-    struct v4l2Buffer   _recordBufs[MAX_CAM_BUFFERS];
-#endif
 
     SecV4L2Adapter*     _v4l2Cam;
     SecV4L2Adapter*     _v4l2Rec;
