@@ -464,30 +464,45 @@ int SecCamera::abortAutoFocus(void)
 
 bool SecCamera::getAutoFocusResult(void)
 {
-    bool afDone = false;
-// TODO: get result of AF is 2 step,
-// V4L2_CID_CAMERA_AUTO_FOCUS_RESULT_FIRST and V4L2_CID_CAMERA_AUTO_FOCUS_RESULT_SECOND
-#if 0
-    int ret = _v4l2Cam->getCtrl(V4L2_CID_CAMERA_AUTO_FOCUS_RESULT);
-    switch (ret) {
-    case 0x01:
-        LOGV("%s: af success.", __func__);
-        afDone = true;
-        break;
-    case 0x02: // AF cancelled!
-        /* CAMERA_MSG_FOCUS only takes a bool.  true for
-         * finished and false for failure.  cancel is still
-         * considered a true result.
-         */
-        LOGI("%s: AF cancelled! but finished anyway.", __func__);
-        afDone = true;
-        break;
+    bool afSuccess = false;
+
+    // TODO: following code is only for S5K4ECGX sensor.
+    // need to move to SecV4L2Adapter or somewhere less general place.
+#define AF_SEARCH_COUNT 80
+#define AF_PROGRESS 0x01
+#define AF_SUCCESS 0x02
+    int ret;
+
+    for (int i = 0; i < AF_SEARCH_COUNT; i++) {
+        ret = _v4l2Cam->getCtrl(V4L2_CID_CAMERA_AUTO_FOCUS_RESULT_FIRST);
+        if (ret != AF_PROGRESS)
+            break;
+        usleep(50000);
+    }
+    if (ret != AF_SUCCESS) {
+        LOGV("%s : 1st AF timed out, failed, or was canceled", __func__);
+        _v4l2Cam->setCtrl(V4L2_CID_CAMERA_FINISH_AUTO_FOCUS, 0);
+        return false;
     }
 
-    LOGW_IF(!afDone, "%s: AF failed! ret = %d", __func__, ret);
-#endif
+    for (int i = 0; i < AF_SEARCH_COUNT; i++) {
+        ret = _v4l2Cam->getCtrl(V4L2_CID_CAMERA_AUTO_FOCUS_RESULT_SECOND);
+        /* low byte is garbage.  done when high byte is 0x0 */
+        if (!(ret & 0xff00)) {
+            afSuccess = true;
+            break;
+        }
+        usleep(50000);
+    }
 
-    return afDone;
+    LOGI("AF was %s", afSuccess ? "successful" : "fail");
+
+    if (_v4l2Cam->setCtrl(V4L2_CID_CAMERA_FINISH_AUTO_FOCUS, 0) < 0) {
+        LOGE("%s: Fail on V4L2_CID_CAMERA_FINISH_AUTO_FOCUS", __func__);
+        return false;
+    }
+
+    return afSuccess;
 }
 
 // ======================================================================
