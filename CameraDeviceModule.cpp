@@ -19,7 +19,7 @@
 #include <utils/Log.h>
 
 #include "CameraHardware.h"
-#include "CameraDevice.h"
+#include "CameraFactory.h"
 #include "CameraLog.h"
 
 namespace android {
@@ -35,7 +35,7 @@ static int cam_dev_set_preview_window(struct camera_device* dev,
     LOG_CAMERA_FUNC_ENTER;
     if (dev->priv == NULL) {
         LOGW_IF(window, "camera device already released and, "
-                "cam_dev_set_preview_window will be ignored!");
+                 "cam_dev_set_preview_window will be ignored!");
         return 0;
     }
 
@@ -254,7 +254,7 @@ exit:
     return 0;
 }
 
-camera_device_t* cam_dev_get_instance(int id)
+static camera_device_t* cam_dev_get_instance(int id)
 {
     if (g_dev != NULL) {
         // TODO: check opened ch id
@@ -279,6 +279,50 @@ camera_device_t* cam_dev_get_instance(int id)
 
 done:
     return g_dev;
+}
+
+static int camera_module_open(const struct hw_module_t* module,
+                              const char* id,
+                              struct hw_device_t** device)
+{
+    int camera_id = atoi(id);
+    LOGI("Opening camera device...");
+    camera_device_t* camera_device = cam_dev_get_instance(camera_id);
+    if (camera_device == NULL) {
+        LOGE("%s: failed to get camera_device for id, %d",
+              __func__, camera_id);
+        return -1;
+    }
+
+    LOGI("Connecting module with device...");
+    camera_device->common.module = const_cast<hw_module_t*>(module);
+
+    *device = (hw_device_t*)camera_device;
+
+    LOGI("Camera module opened");
+    return 0;
+}
+
+static hw_module_methods_t camera_module_methods = {
+    open : camera_module_open,
+};
+
+extern "C" {
+    struct camera_module HAL_MODULE_INFO_SYM = {
+        common : {
+            tag           : HARDWARE_MODULE_TAG,
+            version_major : 1,
+            version_minor : 0,
+            id            : CAMERA_HARDWARE_MODULE_ID,
+            name          : "Insignal Camera HAL",
+            author        : "Homin Lee <suapapa@insignal.co.kr>",
+            methods       : &camera_module_methods,
+            dso           : NULL,
+            reserved      : {0},
+        },
+        get_number_of_cameras : camera_info_get_number_of_cameras,
+        get_camera_info       : camera_info_get_camera_info,
+    };
 }
 
 };

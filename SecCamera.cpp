@@ -676,7 +676,7 @@ int SecCamera::_createThumbnail(uint8_t* rawData, int rawSize)
         goto nothumbnail;
 
     LOGI("making thumb(%dx%d) from picture(%dx%d)...", tW, tH, pW, pH);
-    if (rawSize != pW * pH * 2) {
+    if (rawSize < pW * pH * 2) {
         LOGE("%s: rawSize=%d, expected=%d", __func__, rawSize, pW * pH * 2);
         goto nothumbnail;
     }
@@ -707,9 +707,9 @@ int SecCamera::_createThumbnail(uint8_t* rawData, int rawSize)
             LOGV("copying compressed thumbnail to TaggerParams...");
 
             // It will be deleted from createTaggedJpeg.
-            _exifParams.thumb_data = new uint8_t[thumbJpegSize];
-            memcpy(_exifParams.thumb_data, thumbJpegData, thumbJpegSize);
-            _exifParams.thumb_size = thumbJpegSize;
+            _exifParams.thumbData = new uint8_t[thumbJpegSize];
+            memcpy(_exifParams.thumbData, thumbJpegData, thumbJpegSize);
+            _exifParams.thumbSize = thumbJpegSize;
         }
 
         return 0;
@@ -721,8 +721,8 @@ nothumbnail:
     if (thumbRawData)
         delete[] thumbRawData;
 
-    _exifParams.thumb_data = NULL;
-    _exifParams.thumb_size = 0;
+    _exifParams.thumbData = NULL;
+    _exifParams.thumbSize = 0;
 
     return -1;
 }
@@ -758,7 +758,7 @@ int SecCamera::compress2Jpeg(unsigned char* rawData, size_t rawSize)
     }
 
     LOGI("creating tagged JPEG...");
-    int taggedJpegSize = _tagger->createTaggedJpeg(&_exifParams, jpegBuff, jpegSize);
+    int taggedJpegSize = _tagger->tagToJpeg(&_exifParams, jpegBuff, jpegSize);
 
     //TODO: release alloc memories in _encoder
     // now, taggedJpeg data exists in _exif
@@ -776,7 +776,7 @@ int SecCamera::getJpeg(unsigned char* outBuff, int buffSize)
     int writtenSize = 0;
 
     if (_tagger) {
-        writtenSize = _tagger->copyJpegWithExif(outBuff, buffSize);
+        writtenSize = _tagger->writeTaggedJpeg(outBuff, buffSize);
     } else {
         uint8_t* jpegBuff = NULL;
         int jpegSize = 0;
@@ -820,65 +820,21 @@ int SecCamera::setJpegThumbnailSize(int width, int height)
     return 0;
 }
 
-int SecCamera::_convertGPSCoord(double coord, int* deg, int* min, int* sec)
+int SecCamera::setGpsInfo(const char* strLatitude,
+                          const char* strLongitude,
+                          const char* strAltitude,
+                          const char* strTimestamp,
+                          const char* strProcessMethod)
 {
-    double tmp;
+    _gpsData* gps = &(_exifParams.gps);
 
-    if (coord == 0) {
-        LOGE("%s: Invalid GPS coordinate", __func__);
-
-        return -1;
-    }
-
-    *deg = (int) floor(coord);
-    tmp = (coord - floor(coord)) * 60;
-    *min = (int) floor(tmp);
-    tmp = (tmp - floor(tmp)) * 60;
-    *sec = (int) floor(tmp);
-
-    if (*sec >= 60) {
-        *sec = 0;
-        *min += 1;
-    }
-
-    if (*min >= 60) {
-        *min = 0;
-        *deg += 1;
-    }
-
-    return 0;
-}
-
-int SecCamera::setGpsInfo(const char* strLatitude, const char* strLongitude,
-                          const char* strAltitude, const char* strTimestamp,
-                          const char* strProcessMethod, int nAltitudeRef,
-                          const char* strMapDatum, const char* strGpsVersion)
-{
-    gps_data* gps = &_exifParams.gps_location;
-    double gpsCoord;
-
-    gpsCoord = strtod(strLatitude, NULL);
-    _convertGPSCoord(gpsCoord, &gps->latDeg, &gps->latMin, &gps->latSec);
-    gps->latRef = (gpsCoord < 0) ? (char*) "S" : (char*) "N";
-
-    gpsCoord = strtod(strLongitude, NULL);
-    _convertGPSCoord(gpsCoord, &gps->longDeg, &gps->longMin, &gps->longSec);
-    gps->longRef = (gpsCoord < 0) ? (char*) "W" : (char*) "E";
-
-    gpsCoord = strtod(strAltitude, NULL);
-    gps->altitude = gpsCoord;
-
-    if (NULL != strTimestamp) {
-        gps->timestamp = strtol(strTimestamp, NULL, 10);
-        struct tm* timeinfo = localtime((time_t*) & (gps->timestamp));
-        if (timeinfo != NULL)
-            strftime(gps->datestamp, 11, "%Y:%m:%d", timeinfo);
-    }
-
-    gps->altitudeRef = nAltitudeRef;
-    gps->mapdatum = (char*)strMapDatum;
-    gps->versionId = (char*)strGpsVersion;
+    gps->latitude = strtod(strLatitude, NULL);
+    gps->longitude = strtod(strLongitude, NULL);
+    gps->altitude = strtod(strAltitude, NULL);
     gps->procMethod = (char*)strProcessMethod;
+    if (strTimestamp) {
+        gps->timestamp = strtol(strTimestamp, NULL, 10);
+    }
 
     return 0;
 }
@@ -887,16 +843,16 @@ void SecCamera::_initExifParams(void)
 {
     LOGV("%s: setting default values for _exifParams...", __func__);
     memset(&_exifParams, 0, sizeof(TaggerParams));
-    static const char* strMaker = "TJMedia";
-    static const char* strModel = "TDMK";
+    static const char* strMaker = "Insignal";
+    static const char* strModel = "Camera";
     _exifParams.maker = (char*)strMaker;
     _exifParams.model = (char*)strModel;
     _exifParams.wb = EXIF_WB_AUTO;
-    _exifParams.metering_mode = EXIF_AVERAGE;
+    _exifParams.metering = EXIF_AVERAGE;
     _exifParams.zoom = 1;
     _exifParams.iso = EXIF_ISO_AUTO;
-    _exifParams.thumb_data = NULL;
-    _exifParams.thumb_size = 0;
+    _exifParams.thumbData = NULL;
+    _exifParams.thumbSize = 0;
 }
 
 int SecCamera::_scaleDownYuv422(uint8_t* srcBuf, uint32_t srcWidth, uint32_t srcHight,

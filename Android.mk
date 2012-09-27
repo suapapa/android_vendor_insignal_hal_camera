@@ -15,12 +15,12 @@ LOCAL_SRC_FILES += \
 
 LOCAL_SRC_FILES += \
         CameraHardware.cpp \
-        CameraDevice.cpp \
-        CameraModule.cpp
+        CameraDeviceModule.cpp
 
 # for videodev2_samsung.h and jpeg_api.h
 #LOCAL_C_INCLUDES += $(LOCAL_PATH)/../include
-LOCAL_C_INCLUDES += hardware/samsung/exynos4/hal/include
+#LOCAL_C_INCLUDES += hardware/samsung/exynos4/hal/include
+
 LOCAL_SHARED_LIBRARIES := libutils libui liblog libbinder libdl libcutils
 LOCAL_SHARED_LIBRARIES += libhardware libcamera_client
 

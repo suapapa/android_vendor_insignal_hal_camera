@@ -22,125 +22,59 @@
 
 #include "ExifTagger.h"
 
-#define ARRAY_SIZE(array) (sizeof((array)) / sizeof((array)[0]))
+#define RET_IF_ERR(R) \
+    if (NO_ERROR != ret) {\
+        LOGE("%s:%d somthing wrong! ret = %d", __func__, __LINE__, ret); \
+        return ret; \
+    }
 
 namespace android {
 
-struct string_pair {
-    const char* string1;
-    const char* string2;
-};
+static const char TAG_MODEL[] = "Model";
+static const char TAG_MAKE[] = "Make";
+static const char TAG_FOCALLENGTH[] = "FocalLength";
+static const char TAG_DATETIME[] = "DateTime";
+static const char TAG_IMAGE_WIDTH[] = "ImageWidth";
+static const char TAG_IMAGE_LENGTH[] = "ImageLength";
+static const char TAG_GPS_LAT[] = "GPSLatitude";
+static const char TAG_GPS_LAT_REF[] = "GPSLatitudeRef";
+static const char TAG_GPS_LONG[] = "GPSLongitude";
+static const char TAG_GPS_LONG_REF[] = "GPSLongitudeRef";
+static const char TAG_GPS_ALT[] = "GPSAltitude";
+static const char TAG_GPS_ALT_REF[] = "GPSAltitudeRef";
+static const char TAG_GPS_MAP_DATUM[] = "GPSMapDatum";
+static const char TAG_GPS_PROCESSING_METHOD[] = "GPSProcessingMethod";
+static const char TAG_GPS_VERSION_ID[] = "GPSVersionID";
+static const char TAG_GPS_TIMESTAMP[] = "GPSTimeStamp";
+static const char TAG_GPS_DATESTAMP[] = "GPSDateStamp";
+static const char TAG_ORIENTATION[] = "Orientation";
+static const char TAG_FLASH[] = "Flash";
+static const char TAG_DIGITALZOOMRATIO[] = "DigitalZoomRatio";
+static const char TAG_EXPOSURETIME[] = "ExposureTime";
+static const char TAG_APERTURE[] = "ApertureValue";
+static const char TAG_ISO_EQUIVALENT[] = "ISOSpeedRatings";
+static const char TAG_WHITEBALANCE[] = "WhiteBalance";
+static const char TAG_LIGHT_SOURCE[] = "LightSource";
+static const char TAG_METERING_MODE[] = "MeteringMode";
+static const char TAG_EXPOSURE_PROGRAM[] = "ExposureProgram";
+static const char TAG_COLOR_SPACE[] = "ColorSpace";
+static const char TAG_CPRS_BITS_PER_PIXEL[] = "CompressedBitsPerPixel";
+static const char TAG_FNUMBER[] = "FNumber";
+static const char TAG_SHUTTERSPEED[] = "ShutterSpeedValue";
+static const char TAG_SENSING_METHOD[] = "SensingMethod";
+static const char TAG_CUSTOM_RENDERED[] = "CustomRendered";
 
-static string_pair degress_to_exif_lut [] = {
-    // degrees, exif_orientation
-    {"0",   "1"},
-    {"90",  "6"},
-    {"180", "3"},
-    {"270", "8"},
-};
-
-const char* ExifTagger::_degreesToExifOrientation(const char* degrees)
+ExifTagger::ExifTagger() :
+    _gpsTagCount(0),
+    _exifTagCount(0),
+    _jpegOpened(false)
 {
-    for (unsigned int i = 0; i < ARRAY_SIZE(degress_to_exif_lut); i++) {
-        if (!strcmp(degrees, degress_to_exif_lut[i].string1)) {
-            return degress_to_exif_lut[i].string2;
-        }
-    }
-    return NULL;
+    memset(&_table, 0, sizeof(ExifElement_t) * MAX_EXIF_TAGS_SUPPORTED);
 }
 
-void ExifTagger::stringToRational(const char* str, unsigned int* num, unsigned int* den)
-{
-    int len;
-    char* tempVal = NULL;
-
-    if (str != NULL) {
-        len = strlen(str);
-        tempVal = (char*) malloc(sizeof(char) * (len + 1));
-    }
-
-    if (tempVal != NULL) {
-        // convert the decimal string into a rational
-        size_t den_len;
-        char* ctx;
-        unsigned int numerator = 0;
-        unsigned int denominator = 0;
-        char* temp = NULL;
-
-        memset(tempVal, '\0', len + 1);
-        strncpy(tempVal, str, len);
-        temp = strtok_r(tempVal, ".", &ctx);
-
-        if (temp != NULL)
-            numerator = atoi(temp);
-
-        if (!numerator)
-            numerator = 1;
-
-        temp = strtok_r(NULL, ".", &ctx);
-        if (temp != NULL) {
-            den_len = strlen(temp);
-            if (HUGE_VAL == den_len) {
-                den_len = 0;
-            }
-
-            denominator = static_cast<unsigned int>(pow(10, den_len));
-            numerator = numerator * denominator + atoi(temp);
-        } else {
-            denominator = 1;
-        }
-
-        free(tempVal);
-
-        *num = numerator;
-        *den = denominator;
-    }
-}
-
-bool ExifTagger::_isAsciiTag(const char* tag)
-{
-    // TODO(XXX): Add tags as necessary
-    return (strcmp(tag, TAG_GPS_PROCESSING_METHOD) == 0);
-}
-
-void ExifTagger::insertExifToJpeg(unsigned char* jpeg, size_t jpeg_size)
-{
-    ReadMode_t read_mode = (ReadMode_t)(READ_METADATA | READ_IMAGE);
-
-    ResetJpgfile();
-    if (ReadJpegSectionsFromBuffer(jpeg, jpeg_size, read_mode)) {
-        _jpegOpened = true;
-        create_EXIF(_table, _exifTagCount, _gpsTagCount);
-    }
-}
-
-status_t ExifTagger::insertExifThumbnailImage(const char* thumb, int len)
-{
-    status_t ret = NO_ERROR;
-
-    if ((len > 0) && _jpegOpened) {
-        ret = ReplaceThumbnailFromBuffer(thumb, len);
-        LOGV("insertExifThumbnailImage. ReplaceThumbnail(). ret=%d", ret);
-    }
-
-    return ret;
-}
-
-void ExifTagger::saveJpeg(unsigned char* jpeg, size_t jpeg_size)
-{
-    if (_jpegOpened) {
-        WriteJpegToBuffer(jpeg, jpeg_size);
-        DiscardData();
-        _jpegOpened = false;
-    }
-}
-
-/* public functions */
 ExifTagger::~ExifTagger()
 {
-    int num_elements = _gpsTagCount + _exifTagCount;
-
-    for (int i = 0; i < num_elements; i++) {
+    for (int i = 0; i < MAX_EXIF_TAGS_SUPPORTED; i++) {
         if (_table[i].Value) {
             free(_table[i].Value);
         }
@@ -151,7 +85,109 @@ ExifTagger::~ExifTagger()
     }
 }
 
-status_t ExifTagger::insertElement(const char* tag, const char* value)
+int ExifTagger::tagToJpeg(TaggerParams* p,
+                          const uint8_t* srcBuff,
+                          unsigned int srcSize)
+{
+    status_t ret;
+
+    _gpsTagCount = 0;
+    _exifTagCount = 0;
+
+    if (p == NULL) {
+        return -1;
+    }
+
+    LOGV("fill exif table");
+    ret = _fillExifTable(p);
+
+    LOGV("reset jpeg file");
+    ResetJpgfile();
+
+    ReadMode_t rMode = (ReadMode_t)(READ_METADATA | READ_IMAGE);
+    if (ReadJpegSectionsFromBuffer((unsigned char*)srcBuff, srcSize, rMode)) {
+        _jpegOpened = true;
+        create_EXIF(_table, _exifTagCount, _gpsTagCount);
+
+        const char* td = (const char*)(p->thumbData);
+        unsigned int ts = p->thumbSize;
+        if (td && ts) {
+            status_t ret = ReplaceThumbnailFromBuffer(td, ts);
+            LOGV("insertExifThumbnailImage. ReplaceThumbnail(). ret=%d", ret);
+        } else {
+            LOGI("no thumbnail!");
+        }
+    }
+
+    Section_t* exif_section = FindSection(M_EXIF);
+
+    return srcSize + exif_section->Size;
+}
+
+int ExifTagger::writeTaggedJpeg(uint8_t* destBuff,
+                                int destBuffSize)
+{
+    if (_jpegOpened == false) {
+        LOGE("%s: Jpeg not opened!", __func__);
+        return -1;
+    }
+
+    WriteJpegToBuffer(destBuff, destBuffSize);
+    DiscardData();
+    _jpegOpened = false;
+
+    return destBuffSize;
+}
+
+status_t ExifTagger::_fillExifTable(TaggerParams* p)
+{
+    status_t ret = NO_ERROR;
+    char tempStr[256];
+
+    /*
+    if (p->maker) {
+        ret = _insertTag(TAG_MAKE, p->maker);
+        RET_IF_ERR(ret);
+    }
+
+    if (p->model) {
+        ret = _insertTag(TAG_MODEL, p->model);
+        RET_IF_ERR(ret);
+    }
+    */
+
+    ret = _insertTag(TAG_MAKE, "Insignal Co,. Ltd");
+    RET_IF_ERR(ret);
+
+    ret = _insertTag(TAG_MODEL, "ORIGEN_quad board");
+    RET_IF_ERR(ret);
+
+    if (p->focalNum || p->focalDen) {
+        sprintf(tempStr, "%u/%u", p->focalNum, p->focalDen);
+        ret = _insertTag(TAG_FOCALLENGTH, tempStr);
+        RET_IF_ERR(ret);
+    }
+
+    ret = _insertDatetimeTag();
+    RET_IF_ERR(ret);
+
+    ret = _insertOrientationTag(p->rotation);
+    RET_IF_ERR(ret);
+
+    ret = _insertTag(TAG_IMAGE_WIDTH, p->width);
+    RET_IF_ERR(ret);
+
+    ret = _insertTag(TAG_IMAGE_LENGTH, p->height);
+    RET_IF_ERR(ret);
+
+    ret = _insertGpsTag(&(p->gps));
+    RET_IF_ERR(ret);
+
+    return ret;
+}
+
+
+status_t ExifTagger::_insertTag(const char* tag, const char* value)
 {
     int value_length = 0;
     status_t ret = NO_ERROR;
@@ -160,18 +196,21 @@ status_t ExifTagger::insertElement(const char* tag, const char* value)
         return -EINVAL;
     }
 
-    if (_position >= MAX_EXIF_TAGS_SUPPORTED) {
+    LOGV("t:v = %s:%s", tag, value);
+
+    unsigned int pos = _gpsTagCount + _exifTagCount;
+    if (pos >= MAX_EXIF_TAGS_SUPPORTED) {
         LOGE("Max number of EXIF elements already inserted");
         return NO_MEMORY;
     }
 
-    if (_isAsciiTag(tag)) {
+    if (0 == strncmp(value, ExifAsciiPrefix, sizeof(ExifAsciiPrefix))) {
         value_length = sizeof(ExifAsciiPrefix) + strlen(value + sizeof(ExifAsciiPrefix));
     } else {
         value_length = strlen(value);
     }
 
-    ExifElement_t *e = &(_table[_position]);
+    ExifElement_t* e = &(_table[pos]);
     if (IsGpsTag(tag)) {
         e->GpsTag = TRUE;
         e->Tag = GpsTagNameToValue(tag);
@@ -190,25 +229,156 @@ status_t ExifTagger::insertElement(const char* tag, const char* value)
         e->DataLength = value_length + 1;
     }
 
-    _position++;
     return ret;
 }
 
-int ExifTagger::createTaggedJpeg(TaggerParams* p,
-                                 const uint8_t* jpegData,
-                                 unsigned int jpegSize)
+status_t ExifTagger::_insertTag(const char* tag, unsigned int value)
 {
-    // TODO: Implement TaggerInterface
+    char valueStr[5];
+    sprintf(valueStr, "%d", value);
 
-    return 0;
+    return _insertTag(tag, valueStr);
 }
 
-int ExifTagger::copyJpegWithExif(uint8_t* targetBuff,
-                                 int targetBuffSize)
+status_t ExifTagger::_insertOrientationTag(unsigned int degree)
 {
-    // TODO: Implement TaggerInterface
+    unsigned int lut = 0;
+    switch (degree) {
+    case 0:
+        lut = 1;
+        break;
+    case 90:
+        lut = 6;
+        break;
+    case 180:
+        lut = 3;
+        break;
+    case 270:
+        lut = 8;
+        break;
+    }
 
-    return 0;
+    if (lut == 0) {
+        LOGW("Skip tag orientation! degree, %d not supported!", degree);
+        return NO_ERROR;
+    }
+
+    return _insertTag(TAG_ORIENTATION, lut);
+}
+
+status_t ExifTagger::_insertDatetimeTag(void)
+{
+    struct timeval sTv;
+    struct tm* pTime;
+    int status = gettimeofday(&sTv, NULL);
+    if (status) {
+        return UNKNOWN_ERROR;
+    }
+    pTime = localtime(&sTv.tv_sec);
+    if (NULL == pTime) {
+        return UNKNOWN_ERROR;
+    }
+    char tempStr[256];
+    sprintf(tempStr, "%04d:%02d:%02d %02d:%02d:%02d",
+            pTime->tm_year + 1900,
+            pTime->tm_mon + 1,
+            pTime->tm_mday,
+            pTime->tm_hour,
+            pTime->tm_min,
+            pTime->tm_sec);
+    return _insertTag(TAG_DATETIME, tempStr);
+}
+
+status_t ExifTagger::_insertGpsTag(_gpsData* gps)
+{
+    int d, m, s, sd;
+    char tempStr[256];
+    status_t ret;
+
+    // latitude
+    ret = _convertGPSCoord(gps->latitude, d, m, s, sd);
+    RET_IF_ERR(ret);
+    sprintf(tempStr, "%d/%d,%d/%d,%d/%d",
+            abs(d), 1, abs(m), 1, abs(s), abs(sd));
+    ret = _insertTag(TAG_GPS_LAT, tempStr);
+    RET_IF_ERR(ret);
+    ret = _insertTag(TAG_GPS_LAT_REF,
+                     gps->latitude > 0 ? "N" : "S");
+    RET_IF_ERR(ret);
+
+    // longitute
+    ret = _convertGPSCoord(gps->longitude, d, m, s, sd);
+    RET_IF_ERR(ret);
+    ret = _insertTag(TAG_GPS_LONG, tempStr);
+    RET_IF_ERR(ret);
+    ret = _insertTag(TAG_GPS_LONG_REF,
+                     gps->longitude > 0 ? "E" : "W");
+    RET_IF_ERR(ret);
+
+    // altitude
+    sprintf(tempStr, "%d/%d",
+            abs(floor(fabs(gps->altitude))), 1);
+    ret = _insertTag(TAG_GPS_ALT, tempStr);
+    RET_IF_ERR(ret);
+    ret = _insertTag(TAG_GPS_ALT_REF,
+                     gps->altitude > 0 ? 0 : 1);
+    RET_IF_ERR(ret);
+
+    // procMethod
+    if (0 /* gps->procMethod */) {
+        memcpy(tempStr, ExifAsciiPrefix, sizeof(ExifAsciiPrefix));
+        strcpy(tempStr + sizeof(ExifAsciiPrefix), gps->procMethod);
+        ret = _insertTag(TAG_GPS_PROCESSING_METHOD, tempStr);
+        RET_IF_ERR(ret);
+    }
+
+    // timestamp
+    struct tm* timeinfo = gmtime((time_t*) & (gps->timestamp));
+    sprintf(tempStr, "%d/%d,%d/%d,%d/%d",
+            timeinfo->tm_hour, 1,
+            timeinfo->tm_min, 1,
+            timeinfo->tm_sec, 1);
+    ret = _insertTag(TAG_GPS_TIMESTAMP, tempStr);
+    RET_IF_ERR(ret);
+
+    return NO_ERROR;
+}
+
+status_t ExifTagger::_convertGPSCoord(double coord,
+                                      int& deg,
+                                      int& min,
+                                      int& sec,
+                                      int& secDivisor)
+{
+    if (coord == 0) {
+        LOGE("Invalid GPS coordinate");
+        return -EINVAL;
+    }
+
+#define GPS_MIN_DIV                 60
+#define GPS_SEC_DIV                 60
+#define GPS_SEC_ACCURACY            1000
+
+    double tmp;
+
+    deg = (int) floor(fabs(coord));
+    tmp = (fabs(coord) - floor(fabs(coord))) * GPS_MIN_DIV;
+    min = (int) floor(tmp);
+    tmp = (tmp - floor(tmp)) * (GPS_SEC_DIV * GPS_SEC_ACCURACY);
+    sec = (int) floor(tmp);
+    secDivisor = GPS_SEC_ACCURACY;
+
+    if (sec >= (GPS_SEC_DIV * GPS_SEC_ACCURACY)) {
+        sec = 0;
+        min += 1;
+    }
+
+    if (min >= 60) {
+        min = 0;
+        deg += 1;
+    }
+
+    return NO_ERROR;
 }
 
 }

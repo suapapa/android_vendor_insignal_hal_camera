@@ -34,7 +34,7 @@ public:
     virtual int doCompress(EncoderParams* parm, uint8_t* inBuff, int inBuffSize) = 0;
     virtual int doCompress(uint8_t* inBuff, int inBuffSize) = 0;
 
-    virtual void getOutput(uint8_t** jpegBuff, int* jpegSize);
+    virtual void getOutput(uint8_t** jpegBuff, int* jpegSize) = 0;
     virtual int copyOutput(uint8_t* outBuff, int outBuffSize,
                            bool skipSOI = false) = 0;
 

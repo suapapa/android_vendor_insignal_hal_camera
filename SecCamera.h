@@ -83,10 +83,7 @@ public:
                                    const char* strLongitude,
                                    const char* strAltitude,
                                    const char* strTimestamp = NULL,
-                                   const char* strProcessMethod = NULL,
-                                   int nALtitudeRef = 0,
-                                   const char* strMapDatum = NULL,
-                                   const char* strGpsVersion = NULL);
+                                   const char* strProcessMethod = NULL);
 
     int                 getFd(void);
 
@@ -122,7 +119,6 @@ private:
     TaggerParams        _exifParams;
     void                _initExifParams(void);
 
-    int                 _convertGPSCoord(double coord, int* deg, int* min, int* sec);
     int                 _scaleDownYuv422(uint8_t* srcBuf, uint32_t srcWidth, uint32_t srcHight,
                                          uint8_t* dstBuf, uint32_t dstWidth, uint32_t dstHight);
     int                 _createThumbnail(uint8_t* rawData, int rawSize);

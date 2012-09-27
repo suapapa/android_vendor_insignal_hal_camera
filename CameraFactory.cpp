@@ -27,7 +27,7 @@
 #ifdef LIBJPEG_ENCODER
 #include "LibJpegEncoder.h"
 #endif
-//#include "GnuExifTagger.h"
+#include "ExifTagger.h"
 
 namespace android {
 
@@ -43,8 +43,9 @@ const char* camera_info_get_default_camera_param_str(int camera_id)
         "preview-fps-range=15000,30000;"
         "preview-fps-range-values=(15000,30000);"
         "picture-size=2560x1920;"
-        "picture-size-values=3264x2448,3264x1968,"
-        "2560x1920,2048x1536,2048x1536,2048x1232,"
+        "picture-size-values="
+        // "3264x2448,3264x1968,"
+        // "2560x1920,2048x1536,2048x1536,2048x1232,"
         "1600x1200,1600x960,"
         "800x480,640x480;"
         "picture-format=jpeg;"
@@ -110,7 +111,8 @@ EncoderInterface* get_encoder(void)
 TaggerInterface* get_tagger(void)
 {
     LOGW("No tagger exists!");
-    TaggerInterface* tagger = NULL; //new GnuExifTagger();
+    //TaggerInterface* tagger = NULL; //new GnuExifTagger();
+    TaggerInterface* tagger = new ExifTagger();
     return tagger;
 }
 
