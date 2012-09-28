@@ -30,8 +30,6 @@ public:
     SecCamera(int ch);
     ~SecCamera();
 
-    int                 flagCreate(void) const;
-
     int                 startPreview(void);
     int                 stopPreview(void);
     void                pausePreview();
@@ -66,15 +64,14 @@ public:
     void                setFrameRate(int frame_rate);
     int                 setZoom(int zoom);
 
-    int                 setPictureQuality(int q);
-    int                 setThumbQuality(int q);
-    int                 setJpegThumbnailSize(int width, int height);
-
     int                 startSnapshot(size_t* captureSize);
     int                 getSnapshot(int xth = 0);
     int                 getRawSnapshot(uint8_t* buffer, size_t size);
-    int                 getJpegSnapshot(uint8_t* buffer, size_t size);
     int                 endSnapshot(void);
+
+    int                 setPictureQuality(int q);
+    int                 setThumbnailQuality(int q);
+    int                 setThumbnailSize(int width, int height);
 
     int                 compressToJpeg(unsigned char* rawData, size_t rawSize);
     int                 writeJpeg(unsigned char* outBuff, int buffSize);

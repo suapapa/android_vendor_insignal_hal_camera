@@ -771,7 +771,7 @@ status_t CameraHardware::setParameters(const CameraParameters& parms, bool needI
             || _isParamUpdated(parms, CameraParameters::KEY_JPEG_THUMBNAIL_WIDTH, width)
             || _isParamUpdated(parms, CameraParameters::KEY_JPEG_THUMBNAIL_HEIGHT, height)) {
         LOGV("setting thumbnail size to %dx%d", width, height);
-        err = _camera->setJpegThumbnailSize(width, height);
+        err = _camera->setThumbnailSize(width, height);
         if (!err) {
             _parms.set(CameraParameters::KEY_JPEG_THUMBNAIL_WIDTH, width);
             _parms.set(CameraParameters::KEY_JPEG_THUMBNAIL_HEIGHT, height);
@@ -784,7 +784,7 @@ status_t CameraHardware::setParameters(const CameraParameters& parms, bool needI
     if (needInit
             || _isParamUpdated(parms, strKey, quality)) {
         LOGV("setting %s to %d...", strKey, quality);
-        err = _camera->setThumbQuality(quality);
+        err = _camera->setThumbnailQuality(quality);
         if (!err)
             _parms.set(strKey, quality);
     }

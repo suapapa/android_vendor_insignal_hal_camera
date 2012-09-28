@@ -99,13 +99,6 @@ void SecCamera::_release(void)
         delete _v4l2Rec;
 }
 
-int SecCamera::flagCreate(void) const
-{
-    LOGV("%s() : %d", __func__, _isInited);
-
-    return _isInited == true ? 1 : 0;
-}
-
 int SecCamera::getFd(void)
 {
     return _v4l2Cam->getFd();
@@ -808,14 +801,14 @@ int SecCamera::setPictureQuality(int q)
     return 0;
 }
 
-int SecCamera::setThumbQuality(int q)
+int SecCamera::setThumbnailQuality(int q)
 {
     LOGI("%s: quality = %d", __func__, q);
     _thumbParams.quality = q;
     return 0;
 }
 
-int SecCamera::setJpegThumbnailSize(int width, int height)
+int SecCamera::setThumbnailSize(int width, int height)
 {
     _thumbParams.width = width;
     _thumbParams.height = height;
