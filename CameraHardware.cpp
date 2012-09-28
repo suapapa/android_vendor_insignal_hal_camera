@@ -613,8 +613,7 @@ bool CameraHardware::_pictureLoop()
     _pictureStateChangedCondition.broadcast();
 
     if (_cbData && (_msgs & CAMERA_MSG_COMPRESSED_IMAGE)) {
-        // TODO: the heap size too enough for jpeg..
-        int jpegSize = _camera->compress2Jpeg(rawAddr, rawSize);
+        int jpegSize = _camera->compressToJpeg(rawAddr, rawSize);
         camera_memory_t* jpegHeap = _cbReqMemory(-1, jpegSize, 1, 0);
         if (jpegHeap == NULL) {
             LOGE("%s: Failed to get memory for jpegJeap!", __func__);
@@ -622,7 +621,7 @@ bool CameraHardware::_pictureLoop()
         }
 
         LOGV("getting jpeg snapshot...");
-        _camera->getJpeg((uint8_t*)jpegHeap->data, jpegSize);
+        _camera->writeJpeg((uint8_t*)jpegHeap->data, jpegSize);
         _cbData(CAMERA_MSG_COMPRESSED_IMAGE, jpegHeap, 0, NULL, _cbCookie);
         jpegHeap->release(jpegHeap);
     }

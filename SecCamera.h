@@ -76,8 +76,8 @@ public:
     int                 getJpegSnapshot(uint8_t* buffer, size_t size);
     int                 endSnapshot(void);
 
-    int                 compress2Jpeg(unsigned char* rawData, size_t rawSize);
-    int                 getJpeg(unsigned char* outBuff, int buffSize);
+    int                 compressToJpeg(unsigned char* rawData, size_t rawSize);
+    int                 writeJpeg(unsigned char* outBuff, int buffSize);
 
     int                 setGpsInfo(const char* strLatitude,
                                    const char* strLongitude,

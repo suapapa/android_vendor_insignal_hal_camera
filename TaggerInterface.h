@@ -73,6 +73,7 @@ public:
                           const uint8_t* srcBuff,
                           unsigned int srcSize) = 0;
     virtual int writeTaggedJpeg(uint8_t* destBuff, int destSize) = 0;
+    virtual bool readyToWrite(void) = 0;
 };
 
 }

@@ -727,7 +727,7 @@ nothumbnail:
     return -1;
 }
 
-int SecCamera::compress2Jpeg(unsigned char* rawData, size_t rawSize)
+int SecCamera::compressToJpeg(unsigned char* rawData, size_t rawSize)
 {
     if (rawData == NULL || rawSize == 0) {
         LOGE("%s: null input!", __func__);
@@ -757,16 +757,18 @@ int SecCamera::compress2Jpeg(unsigned char* rawData, size_t rawSize)
         return jpegSize;
     }
 
-    LOGI("creating tagged JPEG...");
+    LOGI("tagging...");
     int taggedJpegSize = _tagger->tagToJpeg(&_exifParams, jpegBuff, jpegSize);
 
-    //TODO: release alloc memories in _encoder
-    // now, taggedJpeg data exists in _exif
+    if (taggedJpegSize == 0) {
+        LOGW("Fail on tagging! will save the jpeg without exif!");
+        return jpegSize;
+    }
 
     return taggedJpegSize;
 }
 
-int SecCamera::getJpeg(unsigned char* outBuff, int buffSize)
+int SecCamera::writeJpeg(unsigned char* outBuff, int buffSize)
 {
     if (_encoder == NULL) {
         LOGE("%s: has no encoder!", __func__);
@@ -775,7 +777,7 @@ int SecCamera::getJpeg(unsigned char* outBuff, int buffSize)
 
     int writtenSize = 0;
 
-    if (_tagger) {
+    if (_tagger && _tagger->readyToWrite()) {
         writtenSize = _tagger->writeTaggedJpeg(outBuff, buffSize);
     } else {
         uint8_t* jpegBuff = NULL;

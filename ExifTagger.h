@@ -37,6 +37,7 @@ public:
                           const uint8_t* srcBuff,
                           unsigned int srcSize);
     virtual int writeTaggedJpeg(uint8_t* destBuff, int destSize);
+    virtual bool readyToWrite(void);
 
 private:
     ExifElement_t _table[MAX_EXIF_TAGS_SUPPORTED];
@@ -58,6 +59,8 @@ private:
                               int& min,
                               int& sec,
                               int& secDivisor);
+
+    void _release(void);
 };
 
 }

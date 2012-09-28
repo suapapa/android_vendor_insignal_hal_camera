@@ -74,34 +74,29 @@ ExifTagger::ExifTagger() :
 
 ExifTagger::~ExifTagger()
 {
-    for (int i = 0; i < MAX_EXIF_TAGS_SUPPORTED; i++) {
-        if (_table[i].Value) {
-            free(_table[i].Value);
-        }
-    }
-
-    if (_jpegOpened) {
-        DiscardData();
-    }
+    _release();
 }
 
 int ExifTagger::tagToJpeg(TaggerParams* p,
                           const uint8_t* srcBuff,
                           unsigned int srcSize)
 {
-    status_t ret;
+    if (_jpegOpened) {
+        LOGE("Previous tagging not completed!");
+        return 0;
+    }
+
+    if (p == NULL) {
+        LOGE("TaggerParams is NULL!");
+        return 0;
+    }
 
     _gpsTagCount = 0;
     _exifTagCount = 0;
 
-    if (p == NULL) {
-        return -1;
-    }
-
-    LOGV("fill exif table");
+    status_t ret;
     ret = _fillExifTable(p);
 
-    LOGV("reset jpeg file");
     ResetJpgfile();
 
     ReadMode_t rMode = (ReadMode_t)(READ_METADATA | READ_IMAGE);
@@ -133,12 +128,30 @@ int ExifTagger::writeTaggedJpeg(uint8_t* destBuff,
     }
 
     WriteJpegToBuffer(destBuff, destBuffSize);
-    DiscardData();
-    _jpegOpened = false;
+    _release();
 
     return destBuffSize;
 }
 
+bool ExifTagger::readyToWrite(void)
+{
+    return _jpegOpened;
+}
+
+void ExifTagger::_release(void)
+{
+    for (int i = 0; i < MAX_EXIF_TAGS_SUPPORTED; i++) {
+        if (_table[i].Value) {
+            free(_table[i].Value);
+            _table[i].Value = NULL;
+        }
+    }
+
+    if (_jpegOpened) {
+        DiscardData();
+    }
+    _jpegOpened = false;
+}
 status_t ExifTagger::_fillExifTable(TaggerParams* p)
 {
     status_t ret = NO_ERROR;
